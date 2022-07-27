@@ -78,7 +78,7 @@ downloadJdbcDrivers <- function(dbms, pathToDriver = Sys.getenv("DATABASECONNECT
     dir.create(pathToDriver, recursive = TRUE)
   }
 
-  stopifnot(is.character(dbms), length(dbms) == 1, dbms %in% c("all", "postgresql", "redshift", "sql server", "oracle", "pdw", "spark"))
+  stopifnot(is.character(dbms), length(dbms) == 1, dbms %in% c("all", "postgresql", "redshift", "sql server", "oracle", "pdw", "spark", "hana"))
 
   if (dbms == "pdw") {
     dbms <- "sql server"
@@ -100,22 +100,32 @@ downloadJdbcDrivers <- function(dbms, pathToDriver = Sys.getenv("DATABASECONNECT
 
   for (db in dbms) {
     driverName <- jdbcDriverNames[[db]]
-    result <- download.file(
-      url = paste0(baseUrl, driverName),
-      destfile = paste(pathToDriver, driverName, sep = "/"),
-      method = method
-    )
-
-    extractedFilename <- unzip(file.path(pathToDriver, driverName), exdir = pathToDriver)
-    unzipSuccess <- is.character(extractedFilename)
-
-    if (unzipSuccess) {
-      file.remove(file.path(pathToDriver, driverName))
-    }
-    if (unzipSuccess && result == 0) {
-      inform(paste0("DatabaseConnector ", db, " JDBC driver downloaded to '", pathToDriver, "'."))
+    if (dbms == "hana") {
+      # https://tools.eu1.hana.ondemand.com/additional/ngdbc-2.13.5.jar
+      result <- download.file(
+        url = paste0("https://tools.eu1.hana.ondemand.com/additional/", driverName),
+        destfile = paste(pathToDriver, driverName, sep = "/"),
+        method = method
+      )
+      
     } else {
-      abort(paste0("Downloading and unzipping of ", db, " JDBC driver to '", pathToDriver, "' has failed."))
+      result <- download.file(
+        url = paste0(baseUrl, driverName),
+        destfile = paste(pathToDriver, driverName, sep = "/"),
+        method = method
+      )
+
+      extractedFilename <- unzip(file.path(pathToDriver, driverName), exdir = pathToDriver)
+      unzipSuccess <- is.character(extractedFilename)
+
+      if (unzipSuccess) {
+        file.remove(file.path(pathToDriver, driverName))
+      }
+      if (unzipSuccess && result == 0) {
+        inform(paste0("DatabaseConnector ", db, " JDBC driver downloaded to '", pathToDriver, "'."))
+      } else {
+        abort(paste0("Downloading and unzipping of ", db, " JDBC driver to '", pathToDriver, "' has failed."))
+      }
     }
   }
 

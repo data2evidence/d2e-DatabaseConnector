@@ -30,7 +30,8 @@ checkIfDbmsIsSupported <- function(dbms) {
     "sqlite",
     "sqlite extended",
     "spark",
-    "hive"
+    "hive",
+    "hana"
   )
   if (!dbms %in% supportedDbmss) {
     abort(sprintf(
@@ -438,6 +439,39 @@ connect <- function(connectionDetails = NULL,
       
       if (!missing(extraSettings) && !is.null(extraSettings)) {
         connectionString <- paste(connectionString, "?", extraSettings, sep = "")
+      }
+    }
+    if (missing(user) || is.null(user)) {
+      connection <- connectUsingJdbcDriver(driver, connectionString, dbms = dbms)
+    } else {
+      connection <- connectUsingJdbcDriver(driver,
+                                           connectionString,
+                                           user = user,
+                                           password = password,
+                                           dbms = dbms
+      )
+    }
+    attr(connection, "dbms") <- dbms
+    return(connection)
+  }
+  if (dbms == "hana") {
+    inform("Connecting using HANA driver")
+    # hardcoded with ngdbc-2.13.5.jar driver version
+    jarPath <- findPathToJar("ngdbc-2.13.5.jar", pathToDriver)
+    driver <- getJbcDriverSingleton("com.sap.db.jdbc.Driver", jarPath)
+    if (missing(connectionString) || is.null(connectionString) || connectionString == "") {
+      if (!grepl("/", server)) {
+        abort("Error: database name not included in server string but is required for HANA. Please specify server as <host>/<database>")
+      }
+      parts <- unlist(strsplit(server, "/"))
+      host <- parts[1]
+      database <- parts[2]
+      if (missing(port) || is.null(port)) {
+        port <- "30015"
+      }
+      connectionString <- paste0("jdbc:sap://", host, ":", port, "/", database)
+      if (!missing(extraSettings) && !is.null(extraSettings)) {
+        connectionString <- paste0(connectionString, "?", extraSettings)
       }
     }
     if (missing(user) || is.null(user)) {
