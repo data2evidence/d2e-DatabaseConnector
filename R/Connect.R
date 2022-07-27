@@ -32,7 +32,8 @@ checkIfDbmsIsSupported <- function(dbms) {
     "spark",
     "snowflake",
     "synapse",
-    "duckdb"
+    "duckdb",
+    "hana"
   )
   if (!dbms %in% supportedDbmss) {
     abort(sprintf(
@@ -315,9 +316,49 @@ connectUsingJdbc <- function(connectionDetails) {
     return(connectSpark(connectionDetails))
   } else if (dbms == "snowflake") {
     return(connectSnowflake(connectionDetails))
+  } else if (dbms == "hana") {
+    return(connectHanaServer(connectionDetails))
   } else {
     abort("Something went wrong when trying to connect to ", dbms)
   }
+}
+
+connectHanaServer <- function(connectionDetails) {
+  inform("Connecting using HANA driver")
+    jarPath <- findPathToJar("^ngdbc-.*.jar$",connectionDetails$pathToDriver)
+    driver <- getJbcDriverSingleton("com.sap.db.jdbc.Driver", jarPath)
+    if (!is.null(connectionDetails$connectionString()) && connectionDetails$connectionString() != "") {
+      connectionString <- connectionDetails$connectionString()
+    } else {
+      if (!grepl("/", connectionDetails$server())) {
+        abort("Error: database name not included in server string but is required for HANA. Please specify server as <host>/<database>")
+      }
+      parts <- unlist(strsplit(connectionDetails$server(), "/"))
+      host <- parts[1]
+      database <- parts[2]
+      if (is.null(connectionDetails$port()) || connectionDetails$port() == "") {
+        port <- "30015"
+      } else {
+        port <- connectionDetails$port()
+      }
+      connectionString <- paste0("jdbc:sap://", host, ":", port, "/", database)
+      if (!is.null(connectionDetails$extraSettings)) {
+        connectionString <- paste0(connectionString, "?",connectionDetails$extraSettings)
+      }
+    }
+
+    if (is.null(connectionDetails$user()) || connectionDetails$user() == "") {
+        connection <- connectUsingJdbcDriver(driver, connectionString, dbms = connectionDetails$dbms)
+    } else {
+        connection <- connectUsingJdbcDriver(driver,
+                                            connectionString,
+                                            user = connectionDetails$user(),
+                                            password = connectionDetails$password(),
+                                            dbms = connectionDetails$dbms
+        )
+    }
+    attr(connection, "dbms") <- connectionDetails$dbms
+    return(connection)
 }
 
 connectSqlServer <- function(connectionDetails) {

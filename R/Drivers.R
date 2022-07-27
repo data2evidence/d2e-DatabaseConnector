@@ -128,7 +128,23 @@ downloadJdbcDrivers <- function(dbms, pathToDriver = Sys.getenv("DATABASECONNECT
     if (unzipSuccess && result == 0) {
       inform(paste0("DatabaseConnector ", db, " JDBC driver downloaded to '", pathToDriver, "'."))
     } else {
-      abort(paste0("Downloading and unzipping of ", db, " JDBC driver to '", pathToDriver, "' has failed."))
+      result <- download.file(
+        url = paste0(baseUrl, driverName),
+        destfile = paste(pathToDriver, driverName, sep = "/"),
+        method = method
+      )
+
+      extractedFilename <- unzip(file.path(pathToDriver, driverName), exdir = pathToDriver)
+      unzipSuccess <- is.character(extractedFilename)
+
+      if (unzipSuccess) {
+        file.remove(file.path(pathToDriver, driverName))
+      }
+      if (unzipSuccess && result == 0) {
+        inform(paste0("DatabaseConnector ", db, " JDBC driver downloaded to '", pathToDriver, "'."))
+      } else {
+        abort(paste0("Downloading and unzipping of ", db, " JDBC driver to '", pathToDriver, "' has failed."))
+      }
     }
   }
 
