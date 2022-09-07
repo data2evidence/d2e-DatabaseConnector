@@ -457,7 +457,7 @@ connect <- function(connectionDetails = NULL,
   if (dbms == "hana") {
     inform("Connecting using HANA driver")
     # hardcoded with ngdbc-2.13.5.jar driver version
-    jarPath <- findPathToJar("ngdbc-2.13.5.jar", pathToDriver)
+    jarPath <- findPathToJar("ngdbc-2.13.5.jar", pathToDriver) # latest available is 2.13.9
     driver <- getJbcDriverSingleton("com.sap.db.jdbc.Driver", jarPath)
     if (missing(connectionString) || is.null(connectionString) || connectionString == "") {
       if (!grepl("/", server)) {
