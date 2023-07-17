@@ -324,34 +324,38 @@ connectUsingJdbc <- function(connectionDetails) {
 
 connectHanaServer <- function(connectionDetails) {
   inform("Connecting using HANA driver")
-    jarPath <- findPathToJar("ngdbc-2.17.7.jar", pathToDriver)
+    jarPath <- findPathToJar("^ngdbc-*.jar$",connectionDetails$pathToDriver)
     driver <- getJbcDriverSingleton("com.sap.db.jdbc.Driver", jarPath)
-    if (missing(connectionString) || is.null(connectionString) || connectionString == "") {
-      if (!grepl("/", server)) {
+    if (!is.null(connectionDetails$connectionString()) && connectionDetails$connectionString() != "") {
+      connectionString <- connectionDetails$connectionString()
+    } else {
+      if (!grepl("/", connectionDetails$server())) {
         abort("Error: database name not included in server string but is required for HANA. Please specify server as <host>/<database>")
       }
-      parts <- unlist(strsplit(server, "/"))
+      parts <- unlist(strsplit(connectionDetails$server(), "/"))
       host <- parts[1]
       database <- parts[2]
-      if (missing(port) || is.null(port)) {
+      if (missing(connectionDetails$port()) || is.null(connectionDetails$port())) {
         port <- "30015"
+      } else {
+        port <- connectionDetails$port()
       }
       connectionString <- paste0("jdbc:sap://", host, ":", port, "/", database)
-      if (!missing(extraSettings) && !is.null(extraSettings)) {
-        connectionString <- paste0(connectionString, "?", extraSettings)
+      if (!is.null(connectionDetails$extraSettings)) {
+        connectionString <- paste0(connectionString, "?",connectionDetails$extraSettings)
+      }
+      if (missing(connectionDetails$user()) || is.null(connectionDetails$user())) {
+        connection <- connectUsingJdbcDriver(driver, connectionString, dbms = connectionDetails$dbms)
+      } else {
+        connection <- connectUsingJdbcDriver(driver,
+                                            connectionString,
+                                            user = connectionDetails$user(),
+                                            password = connectionDetails$password(),
+                                            dbms = connectionDetails$dbms
+        )
       }
     }
-    if (missing(user) || is.null(user)) {
-      connection <- connectUsingJdbcDriver(driver, connectionString, dbms = dbms)
-    } else {
-      connection <- connectUsingJdbcDriver(driver,
-                                           connectionString,
-                                           user = user,
-                                           password = password,
-                                           dbms = dbms
-      )
-    }
-    attr(connection, "dbms") <- dbms
+    attr(connection, "dbms") <- connectionDetails$dbms
     return(connection)
 }
 
