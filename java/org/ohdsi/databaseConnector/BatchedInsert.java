@@ -1,12 +1,16 @@
 package org.ohdsi.databaseConnector;
 
 import java.nio.ByteBuffer;
-import java.sql.BatchUpdateException;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.SQLException;
 import java.sql.SQLFeatureNotSupportedException;
+import java.sql.Timestamp;
+import java.text.ParseException;
+import java.text.SimpleDateFormat;
 import java.util.Collections;
+import java.util.Date;
+import java.util.TimeZone;
 
 public class BatchedInsert {
 	public static int		INTEGER						= 0;
@@ -15,25 +19,34 @@ public class BatchedInsert {
 	public static int		DATE						= 3;
 	public static int		DATETIME					= 4;
 	public static int		BIGINT						= 5;
+	private static String   SPARK                       = "spark";
+	private static String   SNOWFLAKE                   = "snowflake";
+	private static String   BIGQUERY                    = "bigquery";
 	
 	public static final int	BIG_DATA_BATCH_INSERT_LIMIT	= 1000;
+
+	private static final String DATE_FORMAT = "yyyy-MM-dd HH:mm:ss";
 	
 	private Object[]		columns;
 	private int[]			columnTypes;
 	private Connection		connection;
+	private String			dbms;
 	private int				columnCount;
 	private int				rowCount;
 	private String			sql;
 	
-	public BatchedInsert(Connection connection, String sql, int columnCount) throws SQLException {
+	public BatchedInsert(Connection connection, String dbms, String sql, int columnCount) throws SQLException {
 		this.connection = connection;
+		this.dbms = dbms;
 		this.sql = sql;
 		this.columnCount = columnCount;
 		columns = new Object[columnCount];
 		columnTypes = new int[columnCount];
 	}
 	
-	private void trySettingAutoCommit(Connection connection, boolean value) throws SQLException {
+	private void trySettingAutoCommit(boolean value) throws SQLException  {
+		if (dbms.equals(SPARK))
+			return;
 		try {
 			connection.setAutoCommit(value);
 		} catch (SQLFeatureNotSupportedException exception) {
@@ -61,7 +74,7 @@ public class BatchedInsert {
 		}
 	}
 	
-	private void setValue(PreparedStatement statement, int statementIndex, int rowIndex, int columnIndex) throws SQLException {
+	private void setValue(PreparedStatement statement, int statementIndex, int rowIndex, int columnIndex) throws SQLException, ParseException {
 		if (columnTypes[columnIndex] == INTEGER) {
 			int value = ((int[]) columns[columnIndex])[rowIndex];
 			if (value == Integer.MIN_VALUE)
@@ -84,8 +97,14 @@ public class BatchedInsert {
 			String value = ((String[]) columns[columnIndex])[rowIndex];
 			if (value == null)
 				statement.setObject(statementIndex, null);
-			else
-				statement.setTimestamp(statementIndex, java.sql.Timestamp.valueOf(value));
+			else {
+				// snowflake driver uses time zone information from client so we need to
+				// use UTC timezone during parsing the value
+				if (dbms.equals(SNOWFLAKE))
+					setTimestampForSnowflake(statement, statementIndex, value);
+				else
+					statement.setTimestamp(statementIndex, java.sql.Timestamp.valueOf(value));
+			}
 		} else if (columnTypes[columnIndex] == BIGINT) {
 			long value = ((long[]) columns[columnIndex])[rowIndex];
 			if (value == Long.MIN_VALUE)
@@ -100,11 +119,14 @@ public class BatchedInsert {
 				statement.setString(statementIndex, value);
 		}
 	}
+
+	public boolean executeBatch() throws SQLException, ParseException {
+		if (dbms.equals(BIGQUERY))
+	      return executeBigQueryBatch();	
 	
-	public void executeBatch() {
 		checkColumns();
 		try {
-			trySettingAutoCommit(connection, false);
+			trySettingAutoCommit(false);
 			PreparedStatement statement = connection.prepareStatement(sql);
 			for (int i = 0; i < rowCount; i++) {
 				for (int j = 0; j < columnCount; j++)
@@ -112,31 +134,29 @@ public class BatchedInsert {
 				statement.addBatch();
 			}
 			statement.executeBatch();
-			connection.commit();
+			if (!dbms.equals(SPARK))
+				connection.commit();
 			statement.close();
 			connection.clearWarnings();
-			trySettingAutoCommit(connection, true);
-		} catch (SQLException e) {
-			e.printStackTrace();
-			if (e instanceof BatchUpdateException) {
-				System.err.println(((BatchUpdateException) e).getNextException().getMessage());
-			}
+			trySettingAutoCommit(true);
 		} finally {
 			for (int i = 0; i < columnCount; i++) {
 				columns[i] = null;
 			}
 			rowCount = 0;
 		}
+		return true;
 	}
 	
 	/**
 	 * Not all drivers support batch operations, for example GoogleBigQueryJDBC42.jar. In order to save data most efficiently, we implement saving through an
 	 * insert with multiple values.
+	 * @throws SQLException 
 	 */
-	public void executeBigQueryBatch() {
+	private boolean executeBigQueryBatch() throws SQLException, ParseException {
 		checkColumns();
 		try {
-			trySettingAutoCommit(connection, false);
+			trySettingAutoCommit(false);
 			
 			int offset = 0;
 			while (offset < rowCount) {
@@ -157,13 +177,8 @@ public class BatchedInsert {
 				statement.executeUpdate();
 				statement.close();
 				connection.clearWarnings();
-				trySettingAutoCommit(connection, true);
+				trySettingAutoCommit(true);
 				offset += BIG_DATA_BATCH_INSERT_LIMIT;
-			}
-		} catch (SQLException e) {
-			e.printStackTrace();
-			if (e instanceof BatchUpdateException) {
-				System.err.println(((BatchUpdateException) e).getNextException().getMessage());
 			}
 		} finally {
 			for (int i = 0; i < columnCount; i++) {
@@ -171,6 +186,7 @@ public class BatchedInsert {
 			}
 			rowCount = 0;
 		}
+		return true;
 	}
 	
 	private static long[] convertFromInteger64ToLong(double[] value) {
@@ -248,5 +264,12 @@ public class BatchedInsert {
 	
 	public void setBigint(int columnIndex, double column) {
 		setBigint(columnIndex, new double[] { column });
+	}
+
+	private static void setTimestampForSnowflake(PreparedStatement statement, int statementIndex, String value) throws ParseException, SQLException {
+		SimpleDateFormat sdf = new SimpleDateFormat(DATE_FORMAT);
+		sdf.setTimeZone(TimeZone.getTimeZone("UTC"));
+		Date date = sdf.parse(value);
+		statement.setTimestamp(statementIndex, new Timestamp(date.getTime()));
 	}
 }

@@ -9,8 +9,7 @@ import java.sql.SQLFeatureNotSupportedException;
 import java.sql.Statement;
 import java.sql.Timestamp;
 import java.sql.Types;
-import java.text.SimpleDateFormat;
-import java.util.Date;
+import java.sql.Date;
 
 public class BatchedQuery {
 	public static int				NUMERIC			= 1;
@@ -20,8 +19,12 @@ public class BatchedQuery {
 	public static int				INTEGER64		= 5;
 	public static int				INTEGER			= 6;
 	public static int				FETCH_SIZE		= 2048;
-	private static SimpleDateFormat	DATE_FORMAT		= new SimpleDateFormat("yyyy-MM-dd");
-	private static SimpleDateFormat	DATETIME_FORMAT	= new SimpleDateFormat("yyyy-MM-dd HH:mm:ss");
+	public static double            MAX_BATCH_SIZE  = 1000000;
+	public static long              CHECK_MEM_ROWS  = 10000;
+	private static String           SPARK           = "spark";
+    public static double 			NA_DOUBLE 		= Double.longBitsToDouble(0x7ff00000000007a2L);
+    public static int 				NA_INTEGER   	= Integer.MIN_VALUE;
+    public static long 				NA_LONG   		= Long.MIN_VALUE;
 	
 	private Object[]				columns;
 	private int[]					columnTypes;
@@ -34,6 +37,8 @@ public class BatchedQuery {
 	private Connection				connection;
 	private boolean					done;
 	private ByteBuffer				byteBuffer;
+	private long                    remainingMemoryThreshold;
+	private String                  dbms;
 	
 	private static double[] convertToInteger64ForR(long[] value, ByteBuffer byteBuffer) {
 		double[] result = new double[value.length];
@@ -52,25 +57,35 @@ public class BatchedQuery {
 	}
 	
 	public static double getAvailableHeapSpace() {
-		System.gc();
+		return(getAvailableHeapSpace(true));
+	}
+	
+	private static long getAvailableHeapSpace(boolean collectGarbage) {
+		if (collectGarbage)
+			System.gc();
 		return Runtime.getRuntime().maxMemory() - (Runtime.getRuntime().totalMemory() - Runtime.getRuntime().freeMemory());
 	}
 	
 	private void reserveMemory() {
-		double available = getAvailableHeapSpace();
-		int bytesPerRow = 0;
+		long availableMemoryAtStart = getAvailableHeapSpace(true);
+		// Try to estimate bytes needed per row. Note that we could severely underestimate if data contains very large 
+		// strings.
+		int bytesPerRow = 8; // Always have the byte buffer
 		for (int columnIndex = 0; columnIndex < columnTypes.length; columnIndex++)
 			if (columnTypes[columnIndex] == NUMERIC)
 				bytesPerRow += 8;
 			else if (columnTypes[columnIndex] == INTEGER)
 				bytesPerRow += 4;
 			else if (columnTypes[columnIndex] == INTEGER64)
-				bytesPerRow += 16; // 8 more in ByteBuffer
-			else if (columnTypes[columnIndex] == STRING)
+				bytesPerRow += 8;
+			else if (columnTypes[columnIndex] == DATE)
+				bytesPerRow += 4;
+			else if (columnTypes[columnIndex] == DATETIME)
+				bytesPerRow += 8;
+			else // String
 				bytesPerRow += 512;
-			else
-				bytesPerRow += 24;
-		batchSize = (int) Math.round((available / 10d) / (double) bytesPerRow);
+		batchSize = (int) Math.min(MAX_BATCH_SIZE, Math.round((availableMemoryAtStart / 10d) / (double) bytesPerRow));
+		remainingMemoryThreshold = Math.max(bytesPerRow * CHECK_MEM_ROWS * 10, availableMemoryAtStart / 10);
 		columns = new Object[columnTypes.length];
 		for (int columnIndex = 0; columnIndex < columnTypes.length; columnIndex++)
 			if (columnTypes[columnIndex] == NUMERIC)
@@ -81,13 +96,28 @@ public class BatchedQuery {
 				columns[columnIndex] = new long[batchSize];
 			else if (columnTypes[columnIndex] == STRING)
 				columns[columnIndex] = new String[batchSize];
+			else if (columnTypes[columnIndex] == DATE)
+				columns[columnIndex] = new int[batchSize];
+			else if (columnTypes[columnIndex] == DATETIME)
+				columns[columnIndex] = new double[batchSize];
 			else
 				columns[columnIndex] = new String[batchSize];
 		byteBuffer = ByteBuffer.allocate(8 * batchSize);
 		rowCount = 0;
 	}
+
+	private void cleanUpStrings() {
+		for (int columnIndex = 0; columnIndex < columns.length; columnIndex++) 
+			if (columnTypes[columnIndex] == STRING) {
+				String[] column = ((String[]) columns[columnIndex]);
+				for (int i = 0; i < column.length; i++) 
+					column[i] = null;
+			}
+	}
 	
-	private void trySettingAutoCommit(Connection connection, boolean value) throws SQLException {
+	private void trySettingAutoCommit(boolean value) throws SQLException  {
+		if (dbms.equals(SPARK))
+			return;
 		try {
 			connection.setAutoCommit(value);
 		} catch (SQLFeatureNotSupportedException exception) {
@@ -97,8 +127,8 @@ public class BatchedQuery {
 	
 	public BatchedQuery(Connection connection, String query, String dbms) throws SQLException {
 		this.connection = connection;
-		if (connection.getAutoCommit())
-			trySettingAutoCommit(connection, false);
+		this.dbms = dbms;
+		trySettingAutoCommit(false);
 		Statement statement = connection.createStatement(ResultSet.TYPE_FORWARD_ONLY, ResultSet.CONCUR_READ_ONLY);
 		statement.setFetchSize(FETCH_SIZE);
 		resultSet = statement.executeQuery(query);
@@ -112,10 +142,11 @@ public class BatchedQuery {
 			String className = metaData.getColumnClassName(columnIndex + 1);
 			int precision = metaData.getPrecision(columnIndex + 1);
 			int scale = metaData.getScale(columnIndex + 1);
-			if (type == Types.INTEGER || type == Types.SMALLINT || type == Types.TINYINT
-					|| (dbms.equals("oracle") && className.equals("java.math.BigDecimal") && precision != 19 && scale == 0))
+			if (type == Types.INTEGER || type == Types.SMALLINT || type == Types.TINYINT 
+					|| (dbms.equals("oracle") && className.equals("java.math.BigDecimal") && precision > 0 && precision != 19 && scale == 0))
 				columnTypes[columnIndex] = INTEGER;
-			else if (type == Types.BIGINT || (dbms.equals("oracle") && className.equals("java.math.BigDecimal") && precision == 19 && scale == 0))
+			else if (type == Types.BIGINT
+					|| (dbms.equals("oracle") && className.equals("java.math.BigDecimal") && precision > 0 && scale == 0))
 				columnTypes[columnIndex] = INTEGER64;
 			else if (type == Types.DECIMAL || type == Types.DOUBLE || type == Types.FLOAT || type == Types.NUMERIC || type == Types.REAL)
 				columnTypes[columnIndex] = NUMERIC;
@@ -135,42 +166,51 @@ public class BatchedQuery {
 	}
 	
 	public void fetchBatch() throws SQLException {
+		cleanUpStrings();
 		rowCount = 0;
-		while (rowCount < batchSize && resultSet.next()) {
-			for (int columnIndex = 0; columnIndex < columnTypes.length; columnIndex++)
-				if (columnTypes[columnIndex] == NUMERIC) {
-					((double[]) columns[columnIndex])[rowCount] = resultSet.getDouble(columnIndex + 1);
-					if (resultSet.wasNull())
-						((double[]) columns[columnIndex])[rowCount] = Double.NaN;
-				} else if (columnTypes[columnIndex] == INTEGER64) {
-					((long[]) columns[columnIndex])[rowCount] = resultSet.getLong(columnIndex + 1);
-					if (resultSet.wasNull())
-						((long[]) columns[columnIndex])[rowCount] = Long.MIN_VALUE;
-				} else if (columnTypes[columnIndex] == INTEGER) {
-					((int[]) columns[columnIndex])[rowCount] = resultSet.getInt(columnIndex + 1);
-					if (resultSet.wasNull())
-						((int[]) columns[columnIndex])[rowCount] = Integer.MIN_VALUE;
-				} else if (columnTypes[columnIndex] == STRING)
-					((String[]) columns[columnIndex])[rowCount] = resultSet.getString(columnIndex + 1);
-				else if (columnTypes[columnIndex] == DATE) {
-					Date date = resultSet.getDate(columnIndex + 1);
-					if (date == null)
-						((String[]) columns[columnIndex])[rowCount] = null;
-					else
-						((String[]) columns[columnIndex])[rowCount] = DATE_FORMAT.format(date);
-				} else {
-					Timestamp timestamp = resultSet.getTimestamp(columnIndex + 1);
-					if (timestamp == null)
-						((String[]) columns[columnIndex])[rowCount] = null;
-					else
-						((String[]) columns[columnIndex])[rowCount] = DATETIME_FORMAT.format(timestamp);
-					
+		while (rowCount < batchSize) {
+			if (resultSet.next()) {
+				for (int columnIndex = 0; columnIndex < columnTypes.length; columnIndex++)
+					if (columnTypes[columnIndex] == NUMERIC) {
+						((double[]) columns[columnIndex])[rowCount] = resultSet.getDouble(columnIndex + 1);
+						if (resultSet.wasNull())
+							((double[]) columns[columnIndex])[rowCount] = NA_DOUBLE;
+					} else if (columnTypes[columnIndex] == INTEGER64) {
+						((long[]) columns[columnIndex])[rowCount] = resultSet.getLong(columnIndex + 1);
+						if (resultSet.wasNull())
+							((long[]) columns[columnIndex])[rowCount] = NA_LONG;
+					} else if (columnTypes[columnIndex] == INTEGER) {
+						((int[]) columns[columnIndex])[rowCount] = resultSet.getInt(columnIndex + 1);
+						if (resultSet.wasNull())
+							((int[]) columns[columnIndex])[rowCount] = NA_INTEGER;
+					} else if (columnTypes[columnIndex] == STRING)
+						((String[]) columns[columnIndex])[rowCount] = resultSet.getString(columnIndex + 1);
+					else if (columnTypes[columnIndex] == DATE) {
+						Date date = resultSet.getDate(columnIndex + 1);
+						if (date == null)
+							((int[]) columns[columnIndex])[rowCount] = NA_INTEGER;
+						else
+							((int[]) columns[columnIndex])[rowCount] = (int)date.toLocalDate().toEpochDay();
+					} else {
+						Timestamp timestamp = resultSet.getTimestamp(columnIndex + 1);
+						if (timestamp == null)
+							((double[]) columns[columnIndex])[rowCount] = NA_DOUBLE;
+						else
+							((double[]) columns[columnIndex])[rowCount] = timestamp.getTime() / 1000;
+
+					}
+				rowCount++;
+				if (rowCount % CHECK_MEM_ROWS == 0) {
+					if (getAvailableHeapSpace(false) < remainingMemoryThreshold)
+						if (getAvailableHeapSpace(true) < remainingMemoryThreshold)
+							break;
 				}
-			rowCount++;
-		}
-		if (rowCount < batchSize) {
-			done = true;
-			trySettingAutoCommit(connection, true);
+			} else {
+				done = true;
+				trySettingAutoCommit(true);
+				break;
+			}
+
 		}
 		totalRowCount += rowCount;
 	}

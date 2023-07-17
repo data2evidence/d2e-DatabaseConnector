@@ -1,6 +1,6 @@
 # @file RStudio.R
 #
-# Copyright 2022 Observational Health Data Sciences and Informatics
+# Copyright 2023 Observational Health Data Sciences and Informatics
 #
 # This file is part of DatabaseConnector
 #
@@ -61,7 +61,7 @@ registerWithRStudio <- function(connection) {
 }
 
 compileTypeLabel <- function(connection) {
-  return(paste0("DatabaseConnector (", connection@dbms, ")"))
+  return(paste0("DatabaseConnector (", dbms(connection), ")"))
 }
 
 unregisterWithRStudio <- function(connection) {
@@ -76,7 +76,7 @@ unregisterWithRStudio <- function(connection) {
 }
 
 hasCatalogs <- function(connection) {
-  return(connection@dbms %in% c("pdw", "sql server", "postgresql", "redshift", "spark", "bigquery", "hana"))
+  return(dbms(connection) %in% c("pdw", "postgresql", "sql server", "synapse", "redshift", "snowflake", "spark", "bigquery", "duckdb", "hana"))
 }
 
 listDatabaseConnectorColumns <- function(connection,
@@ -92,7 +92,7 @@ listDatabaseConnectorColumns.default <- function(connection,
                                                  schema = NULL,
                                                  table = NULL,
                                                  ...) {
-  if (connection@dbms == "oracle") {
+  if (dbms(connection) == "oracle") {
     table <- toupper(table)
     if (!is.null(catalog)) {
       catalog <- toupper(catalog)
@@ -141,10 +141,16 @@ listDatabaseConnectorColumns.DatabaseConnectorDbiConnection <- function(connecti
                                                                         schema = NULL,
                                                                         table = NULL,
                                                                         ...) {
+  if (!is.null(schema)) {
+    table <- paste(schema, table, sep = ".")
+  }
+  if (!is.null(catalog)) {
+    table <- paste(catalog, table, sep = ".")
+  }
   res <- DBI::dbSendQuery(connection@dbiConnection, sprintf("SELECT * FROM %s LIMIT 0;", table))
   info <- dbColumnInfo(res)
   dbClearResult(res)
-  if (connection@dbms == "sqlite") {
+  if (dbms(connection) == "sqlite") {
     info$type[grepl("DATE$", info$name)] <- "date"
     info$type[grepl("DATETIME$", info$name)] <- "datetime"
   }
@@ -168,7 +174,7 @@ listDatabaseConnectorObjects <- function(connection, catalog = NULL, schema = NU
       stringsAsFactors = FALSE
     ))
   }
-  if (!hasCatalogs(connection) || connection@dbms %in% c("postgresql", "redshift", "sqlite", "sqlite extended", "bigquery", "hana")) {
+  if (!hasCatalogs(connection) || dbms(connection) %in% c("postgresql", "redshift", "sqlite", "sqlite extended", "bigquery", "hana")) {
     databaseSchema <- schema
   } else {
     databaseSchema <- paste(catalog, schema, sep = ".")
@@ -193,14 +199,14 @@ listDatabaseConnectorObjectTypes <- function(connection) {
 }
 
 previewObject <- function(connection, rowLimit, catalog = NULL, table = NULL, schema = NULL) {
-  if (!hasCatalogs(connection)) {
+  if (!hasCatalogs(connection) || dbms(connection) %in% c("postgresql", "redshift", "sqlite", "sqlite extended", "bigquery")) {
     databaseSchema <- schema
   } else {
     databaseSchema <- paste(catalog, schema, sep = ".")
   }
   sql <- "SELECT TOP 1000 * FROM @databaseSchema.@table;"
   sql <- SqlRender::render(sql = sql, databaseSchema = databaseSchema, table = table)
-  sql <- SqlRender::translate(sql = sql, targetDialect = connection@dbms)
+  sql <- SqlRender::translate(sql = sql, targetDialect = dbms(connection))
   querySql(connection, sql)
 }
 
@@ -215,7 +221,7 @@ getServer <- function(connection) {
 }
 
 getServer.default <- function(connection) {
-  if (connection@dbms == "hive") {
+  if (dbms(connection) == "hive") {
     url <- connection@url
   } else {
     databaseMetaData <- rJava::.jcall(
@@ -243,7 +249,7 @@ compileReconnectCode.default <- function(connection) {
     "Ljava/sql/DatabaseMetaData;",
     "getMetaData"
   )
-  if (connection@dbms == "hive") {
+  if (dbms(connection) == "hive") {
     url <- connection@url
     user <- connection@user
   } else {
@@ -252,7 +258,7 @@ compileReconnectCode.default <- function(connection) {
   }
   code <- sprintf(
     "library(DatabaseConnector)\ncon <- connect(dbms = \"%s\", connectionString = \"%s\", user = \"%s\", password = password)",
-    connection@dbms,
+    dbms(connection),
     url,
     user
   )
@@ -262,7 +268,7 @@ compileReconnectCode.default <- function(connection) {
 compileReconnectCode.DatabaseConnectorDbiConnection <- function(connection) {
   code <- sprintf(
     "library(DatabaseConnector)\ncon <- connect(dbms = \"%s\", server = \"%s\")",
-    connection@dbms,
+    dbms(connection),
     connection@server
   )
   return(code)
@@ -296,11 +302,25 @@ getSchemaNames.default <- function(conn, catalog = NULL) {
 }
 
 getSchemaNames.DatabaseConnectorDbiConnection <- function(conn, catalog = NULL) {
-  return("main")
+  if (dbms(conn) %in% c("sqlite", "sqlite extended")) {
+    return("main")
+  } else if (dbms(conn) == "spark") {
+    schemas <- DBI::dbGetQuery(conn@dbiConnection, "SHOW DATABASES")
+    return(schemas[, 1])
+  } else if (conn@dbms == "duckdb") {
+    return(dbGetQuery(conn, sprintf("SELECT schema_name FROM information_schema.schemata WHERE catalog_name = '%s'", catalog))$schema_name)
+  } else {
+    schemas <- DBI::dbGetQuery(conn@dbiConnection, "SELECT schema_name FROM information_schema.schemata;")
+    return(schemas[, 1])
+  }
 }
 
-getCatalogs <- function(conn) {
-  metaData <- rJava::.jcall(conn@jConnection, "Ljava/sql/DatabaseMetaData;", "getMetaData")
+getCatalogs <- function(connection) {
+  UseMethod("getCatalogs", connection)
+}
+
+getCatalogs.default <- function(connection) {
+  metaData <- rJava::.jcall(connection@jConnection, "Ljava/sql/DatabaseMetaData;", "getMetaData")
   resultSet <- rJava::.jcall(metaData, "Ljava/sql/ResultSet;", "getCatalogs")
   on.exit(rJava::.jcall(resultSet, "V", "close"))
   schemas <- character()
@@ -309,4 +329,16 @@ getCatalogs <- function(conn) {
     catalogs <- c(catalogs, rJava::.jcall(resultSet, "S", "getString", "TABLE_CAT"))
   }
   return(catalogs)
+}
+
+getCatalogs.DatabaseConnectorDbiConnection <- function(connection) {
+  if (connection@dbms == "duckdb") {
+    sql <- "
+    SELECT DISTINCT catalog_name 
+    FROM information_schema.schemata
+    WHERE catalog_name NOT IN ('system', 'temp');"
+    return(dbGetQuery(connection, sql)$catalog_name)
+  } else {
+    return(DBI::dbGetInfo(connection@dbiConnection)$dbname)
+  }
 }
