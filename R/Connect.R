@@ -32,7 +32,8 @@ checkIfDbmsIsSupported <- function(dbms) {
     "spark",
     "snowflake",
     "synapse",
-    "duckdb"
+    "duckdb",
+    "hana"
   )
   if (!dbms %in% supportedDbmss) {
     abort(sprintf(
@@ -324,7 +325,7 @@ connectUsingJdbc <- function(connectionDetails) {
 
 connectHanaServer <- function(connectionDetails) {
   inform("Connecting using HANA driver")
-    jarPath <- findPathToJar("^ngdbc-*.jar$",connectionDetails$pathToDriver)
+    jarPath <- findPathToJar("^ngdbc-.*.jar$",connectionDetails$pathToDriver)
     driver <- getJbcDriverSingleton("com.sap.db.jdbc.Driver", jarPath)
     if (!is.null(connectionDetails$connectionString()) && connectionDetails$connectionString() != "") {
       connectionString <- connectionDetails$connectionString()
@@ -335,7 +336,7 @@ connectHanaServer <- function(connectionDetails) {
       parts <- unlist(strsplit(connectionDetails$server(), "/"))
       host <- parts[1]
       database <- parts[2]
-      if (missing(connectionDetails$port()) || is.null(connectionDetails$port())) {
+      if (is.null(connectionDetails$port()) || connectionDetails$port() == "") {
         port <- "30015"
       } else {
         port <- connectionDetails$port()
@@ -344,16 +345,17 @@ connectHanaServer <- function(connectionDetails) {
       if (!is.null(connectionDetails$extraSettings)) {
         connectionString <- paste0(connectionString, "?",connectionDetails$extraSettings)
       }
-      if (missing(connectionDetails$user()) || is.null(connectionDetails$user())) {
+    }
+
+    if (is.null(connectionDetails$user()) || connectionDetails$user() == "") {
         connection <- connectUsingJdbcDriver(driver, connectionString, dbms = connectionDetails$dbms)
-      } else {
+    } else {
         connection <- connectUsingJdbcDriver(driver,
                                             connectionString,
                                             user = connectionDetails$user(),
                                             password = connectionDetails$password(),
                                             dbms = connectionDetails$dbms
         )
-      }
     }
     attr(connection, "dbms") <- connectionDetails$dbms
     return(connection)
