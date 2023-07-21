@@ -14,11 +14,14 @@ downloadJdbcDrivers(
 \arguments{
 \item{dbms}{The type of DBMS to download Jar files for.
 \itemize{
-    \item{"postgresql" for PostgreSQL}
-    \item{"redshift" for Amazon Redshift}
-    \item{"sql server" or "pdw" for Microsoft SQL Server}
-    \item{"oracle" for Oracle}
-    \item{"spark" for Spark}
+\item "postgresql" for PostgreSQL
+\item "redshift" for Amazon Redshift
+\item "sql server", "pdw" or "synapse" for Microsoft SQL Server
+\item "oracle" for Oracle
+\item "spark" for Spark
+\item "snowflake" for Snowflake
+\item "bigquery" for Google BigQuery
+\item "all" for all aforementioned platforms
 }}
 
 \item{pathToDriver}{The full path to the folder where the JDBC driver .jar files should be downloaded to.
@@ -26,7 +29,7 @@ By default the value of the environment variable "DATABASECONNECTOR_JAR_FOLDER" 
 
 \item{method}{The method used for downloading files. See \code{?download.file} for details and options.}
 
-\item{...}{Further arguments passed on to \code{download.file}}
+\item{...}{Further arguments passed on to \code{download.file}.}
 }
 \value{
 Invisibly returns the destination if the download was successful.
@@ -37,11 +40,13 @@ Download the DatabaseConnector JDBC drivers from https://ohdsi.github.io/Databas
 \details{
 The following versions of the JDBC drivers are currently used:
 \itemize{
-  \item{PostgreSQL}{V42.2.18}
-  \item{RedShift}{V1.2.27.1051}
-  \item{SQL Server}{V8.4.1.zip}
-  \item{Oracle}{V19.8}
-  \item{Spark}{V2.6.21}
+\item PostgreSQL: V42.2.18
+\item RedShift: V2.1.0.9
+\item SQL Server: V9.2.0
+\item Oracle: V19.8
+\item Spark: V2.6.21
+\item Snowflake: V3.13.22
+\item BigQuery: v1.3.2.1003
 }
 }
 \examples{

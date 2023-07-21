@@ -1,6 +1,6 @@
 # @file Drivers.R
 #
-# Copyright 2022 Observational Health Data Sciences and Informatics
+# Copyright 2023 Observational Health Data Sciences and Informatics
 #
 # This file is part of DatabaseConnector
 #
@@ -25,26 +25,30 @@ jdbcDrivers <- new.env()
 #' @param pathToDriver The full path to the folder where the JDBC driver .jar files should be downloaded to.
 #'        By default the value of the environment variable "DATABASECONNECTOR_JAR_FOLDER" is used.
 #' @param dbms The type of DBMS to download Jar files for.
-#'      \itemize{
-#'          \item{"postgresql" for PostgreSQL}
-#'          \item{"redshift" for Amazon Redshift}
-#'          \item{"sql server" or "pdw" for Microsoft SQL Server}
-#'          \item{"oracle" for Oracle}
-#'          \item{"spark" for Spark}
-#'      }
-#' @param method The method used for downloading files. See \code{?download.file} for details and options.
-#' @param ... Further arguments passed on to \code{download.file}
+#'  
+#' - "postgresql" for PostgreSQL
+#' - "redshift" for Amazon Redshift
+#' - "sql server", "pdw" or "synapse" for Microsoft SQL Server
+#' - "oracle" for Oracle
+#' - "spark" for Spark
+#' - "snowflake" for Snowflake
+#' - "bigquery" for Google BigQuery
+#' - "all" for all aforementioned platforms
+#'  
+#' @param method The method used for downloading files. See `?download.file` for details and options.
+#' @param ... Further arguments passed on to `download.file`.
 #'
 #' @details
 #' The following versions of the JDBC drivers are currently used:
-#' \itemize{
-#'   \item{PostgreSQL}{V42.2.18}
-#'   \item{RedShift}{V1.2.27.1051}
-#'   \item{SQL Server}{V8.4.1.zip}
-#'   \item{Oracle}{V19.8}
-#'   \item{Spark}{V2.6.21}
-#' }
-#'
+#' 
+#' - PostgreSQL: V42.2.18
+#' - RedShift: V2.1.0.9
+#' - SQL Server: V9.2.0
+#' - Oracle: V19.8
+#' - Spark: V2.6.21
+#' - Snowflake: V3.13.22
+#' - BigQuery: v1.3.2.1003
+#' 
 #' @return Invisibly returns the destination if the download was successful.
 #' @export
 #'
@@ -78,54 +82,53 @@ downloadJdbcDrivers <- function(dbms, pathToDriver = Sys.getenv("DATABASECONNECT
     dir.create(pathToDriver, recursive = TRUE)
   }
 
-  stopifnot(is.character(dbms), length(dbms) == 1, dbms %in% c("all", "postgresql", "redshift", "sql server", "oracle", "pdw", "spark", "hana"))
+  stopifnot(is.character(dbms), length(dbms) == 1, dbms %in% c("all", "postgresql", "redshift", "sql server", "oracle", "pdw", "snowflake", "spark", "bigquery"))
 
-  if (dbms == "pdw") {
+  if (dbms == "pdw" || dbms == "synapse") {
     dbms <- "sql server"
   }
-
-  baseUrl <- "https://ohdsi.github.io/DatabaseConnectorJars/"
-
-  jdbcDriverNames <- c(
-    "postgresql" = "postgresqlV42.2.18.zip",
-    "redshift" = "redShiftV1.2.27.1051.zip",
-    "sql server" = "sqlServerV9.2.0.zip",
-    "oracle" = "oracleV19.8.zip",
-    "spark" = "SimbaSparkV2.6.21.zip"
+  
+  jdbcDriverSources <- utils::read.csv(text = 
+    "row,dbms, fileName, baseUrl
+    1,postgresql,postgresqlV42.2.18.zip,https://ohdsi.github.io/DatabaseConnectorJars/
+    2,redshift,redShiftV2.1.0.9.zip,https://ohdsi.github.io/DatabaseConnectorJars/
+    3,sql server,sqlServerV9.2.0.zip,https://ohdsi.github.io/DatabaseConnectorJars/
+    4,oracle,oracleV19.8.zip,https://ohdsi.github.io/DatabaseConnectorJars/
+    5,spark,DatabricksJDBC42-2.6.32.1054.zip,https://databricks-bi-artifacts.s3.us-east-2.amazonaws.com/simbaspark-drivers/jdbc/2.6.32/
+    6,snowflake,SnowflakeV3.13.22.zip,https://ohdsi.github.io/DatabaseConnectorJars/
+    7,bigquery,SimbaBigQueryJDBC42-1.3.2.1003.zip,https://storage.googleapis.com/simba-bq-release/jdbc/"
   )
-
   if (dbms == "all") {
-    dbms <- names(jdbcDriverNames)
+    dbms <- jdbcDriverSources$dbms
   }
-
   for (db in dbms) {
-    driverName <- jdbcDriverNames[[db]]
-    if (dbms == "hana") {
-      # https://tools.eu1.hana.ondemand.com/additional/ngdbc-2.13.5.jar
-      result <- download.file(
-        url = paste0("https://tools.eu1.hana.ondemand.com/additional/", driverName),
-        destfile = paste(pathToDriver, driverName, sep = "/"),
-        method = method
-      )
-      
+    if (db == "redshift") {
+      oldFiles <- list.files(pathToDriver, "Redshift")
+      if (length(oldFiles) > 0) {
+        message(sprintf("Prior JAR files have already been detected: '%s'. Do you want to delete them?", paste(oldFiles, collapse = "', '")))
+        if (interactive() && utils::menu(c("Yes", "No")) == 1) {
+          unlink(file.path(pathToDriver, oldFiles))
+        }
+      }
+    }
+    driverSource <- jdbcDriverSources[jdbcDriverSources$dbms == db, ]
+
+    result <- download.file(
+      url = paste0(driverSource$baseUrl, driverSource$fileName),
+      destfile = file.path(pathToDriver, driverSource$fileName),
+      method = method
+    )
+
+    extractedFilename <- unzip(file.path(pathToDriver, driverSource$fileName), exdir = pathToDriver)
+    unzipSuccess <- is.character(extractedFilename)
+
+    if (unzipSuccess) {
+      file.remove(file.path(pathToDriver, driverSource$fileName))
+    }
+    if (unzipSuccess && result == 0) {
+      inform(paste0("DatabaseConnector ", db, " JDBC driver downloaded to '", pathToDriver, "'."))
     } else {
-      result <- download.file(
-        url = paste0(baseUrl, driverName),
-        destfile = paste(pathToDriver, driverName, sep = "/"),
-        method = method
-      )
-
-      extractedFilename <- unzip(file.path(pathToDriver, driverName), exdir = pathToDriver)
-      unzipSuccess <- is.character(extractedFilename)
-
-      if (unzipSuccess) {
-        file.remove(file.path(pathToDriver, driverName))
-      }
-      if (unzipSuccess && result == 0) {
-        inform(paste0("DatabaseConnector ", db, " JDBC driver downloaded to '", pathToDriver, "'."))
-      } else {
-        abort(paste0("Downloading and unzipping of ", db, " JDBC driver to '", pathToDriver, "' has failed."))
-      }
+      abort(paste0("Downloading and unzipping of ", db, " JDBC driver to '", pathToDriver, "' has failed."))
     }
   }
 

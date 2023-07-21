@@ -1,6 +1,6 @@
 # @file BulkLoad.R
 #
-# Copyright 2022 Observational Health Data Sciences and Informatics
+# Copyright 2023 Observational Health Data Sciences and Informatics
 #
 # This file is part of DatabaseConnector
 #
@@ -17,13 +17,13 @@
 # limitations under the License.
 
 checkBulkLoadCredentials <- function(connection) {
-  if (connection@dbms == "pdw" && tolower(Sys.info()["sysname"]) == "windows") {
+  if (dbms(connection) == "pdw" && tolower(Sys.info()["sysname"]) == "windows") {
     if (Sys.getenv("DWLOADER_PATH") == "") {
       inform("Please set environment variable DWLOADER_PATH to DWLoader binary path.")
       return(FALSE)
     }
     return(TRUE)
-  } else if (connection@dbms == "redshift") {
+  } else if (dbms(connection) == "redshift") {
     envSet <- FALSE
     bucket <- FALSE
 
@@ -40,7 +40,7 @@ checkBulkLoadCredentials <- function(connection) {
       warn("Not using Server Side Encryption for AWS S3")
     }
     return(envSet & bucket)
-  } else if (connection@dbms == "hive") {
+  } else if (dbms(connection) == "hive") {
     if (Sys.getenv("HIVE_NODE_HOST") == "") {
       inform("Please set environment variable HIVE_NODE_HOST to the Hive Node's host:port")
       return(FALSE)
@@ -56,7 +56,7 @@ checkBulkLoadCredentials <- function(connection) {
       warn("Using ssh password authentication, it's recommended to use keyfile instead")
     }
     return(TRUE)
-  } else if (connection@dbms == "postgresql") {
+  } else if (dbms(connection) == "postgresql") {
     if (Sys.getenv("POSTGRES_PATH") == "") {
       inform("Please set environment variable POSTGRES_PATH to Postgres binary path (e.g. 'C:/Program Files/PostgreSQL/11/bin'.")
       return(FALSE)
@@ -84,6 +84,7 @@ countRows <- function(connection, sqlTableName) {
 
 bulkLoadPdw <- function(connection, sqlTableName, sqlDataTypes, data) {
   ensure_installed("urltools")
+  logTrace(sprintf("Inserting %d rows into table '%s' using PDW bulk load", nrow(data), sqlTableName))
   start <- Sys.time()
   # Format integer fields to prevent scientific notation:
   for (i in 1:ncol(data)) {
@@ -165,6 +166,7 @@ bulkLoadPdw <- function(connection, sqlTableName, sqlDataTypes, data) {
 bulkLoadRedshift <- function(connection, sqlTableName, data) {
   ensure_installed("R.utils")
   ensure_installed("aws.s3")
+  logTrace(sprintf("Inserting %d rows into table '%s' using RedShift bulk load", nrow(data), sqlTableName))
   start <- Sys.time()
 
   csvFileName <- tempfile("redshift_insert_", fileext = ".csv")
@@ -220,6 +222,7 @@ bulkLoadHive <- function(connection, sqlTableName, sqlFieldNames, data) {
   if (tolower(Sys.info()["sysname"]) == "windows") {
     ensure_installed("ssh")
   }
+  logTrace(sprintf("Inserting %d rows into table '%s' using Hive bulk load", nrow(data), sqlTableName))
   start <- Sys.time()
   csvFileName <- tempfile("hive_insert_", fileext = ".csv")
   write.csv(x = data, na = "", file = csvFileName, row.names = FALSE, quote = TRUE)
@@ -285,6 +288,7 @@ bulkLoadHive <- function(connection, sqlTableName, sqlFieldNames, data) {
 
 
 bulkLoadPostgres <- function(connection, sqlTableName, sqlFieldNames, sqlDataTypes, data) {
+  logTrace(sprintf("Inserting %d rows into table '%s' using PostgreSQL bulk load", nrow(data), sqlTableName))
   startTime <- Sys.time()
 
   for (i in 1:ncol(data)) {
