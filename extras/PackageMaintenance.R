@@ -32,7 +32,7 @@ devtools::spell_check()
 
 # Create manual ----------------------------------------------------------------
 unlink("extras/DatabaseConnector.pdf")
-shell("R CMD Rd2pdf ./ --output=extras/DatabaseConnector.pdf")
+system("R CMD Rd2pdf ./ --output=extras/DatabaseConnector.pdf")
 
 dir.create("inst/doc")
 rmarkdown::render("vignettes/Connecting.Rmd",
@@ -59,8 +59,9 @@ fixRdFile <- function(fileName) {
   page <- gsub("\\\\Sexpr[^\n]*\n", "", page)
   SqlRender::writeSql(page, fileName)
 }
-fixRdFile("man/DatabaseConnectorConnection-class.Rd")
-fixRdFile("man/dbGetInfo-DatabaseConnectorDriver-method.Rd")
+for (file in list.files("man", ".*.Rd")) {
+  fixRdFile(file.path("man", file))
+}
 pkgdown::build_site()
 OhdsiRTools::fixHadesLogo()
 
@@ -80,6 +81,13 @@ databaseSchema <- Sys.getenv("CDM5_ORACLE_OHDSI_SCHEMA")
 tables <- getTableNames(connection, databaseSchema, cast = "none")
 sql <- paste(sprintf("DROP TABLE %s.%s;", databaseSchema, tables), collapse= "\n")
 executeSql(connection, sql)
+
+databaseSchema <- Sys.getenv("CDM5_ORACLE_CDM54_SCHEMA")
+tables <- getTableNames(connection, databaseSchema, cast = "none")
+tables <- tables[grepl("", tables)]
+sql <- paste(sprintf("DROP TABLE %s.%s;", databaseSchema, tables), collapse= "\n")
+executeSql(connection, sql)
+
 disconnect(connection)
 
 # Postgres
@@ -93,6 +101,12 @@ databaseSchema <- Sys.getenv("CDM5_POSTGRESQL_OHDSI_SCHEMA")
 tables <- getTableNames(connection, databaseSchema)
 sql <- paste(sprintf("DROP TABLE %s.\"%s\" CASCADE;", databaseSchema, tables), collapse= "\n")
 executeSql(connection, sql)
+
+schemas <- querySql(connection, "SELECT schema_name FROM information_schema.schemata;")[, 1]
+schemas <- schemas[grepl("^r[0-9]+$", schemas)]
+sql <- paste(sprintf("DROP SCHEMA %s CASCADE;", schemas), collapse= "\n")
+executeSql(connection, sql)
+
 disconnect(connection)
 
 # SQL Server

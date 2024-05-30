@@ -286,7 +286,6 @@ bulkLoadHive <- function(connection, sqlTableName, sqlFieldNames, data) {
   )
 }
 
-
 bulkLoadPostgres <- function(connection, sqlTableName, sqlFieldNames, sqlDataTypes, data) {
   logTrace(sprintf("Inserting %d rows into table '%s' using PostgreSQL bulk load", nrow(data), sqlTableName))
   startTime <- Sys.time()
@@ -306,13 +305,12 @@ bulkLoadPostgres <- function(connection, sqlTableName, sqlFieldNames, sqlDataTyp
   password <- attr(connection, "password")()
 
   if (.Platform$OS.type == "windows") {
-    winPsqlPath <- Sys.getenv("POSTGRES_PATH")
-    command <- file.path(winPsqlPath, "psql.exe")
-    if (!file.exists(command)) {
-      abort(paste("Could not find psql.exe in ", winPsqlPath))
-    }
+    command <- file.path(Sys.getenv("POSTGRES_PATH"), "psql.exe")
   } else {
-    command <- "psql"
+    command <- file.path(Sys.getenv("POSTGRES_PATH"), "psql")
+  }
+  if (!file.exists(command)) {
+    abort(paste("Could not find psql.exe in ", Sys.getenv("POSTGRES_PATH")))
   }
   headers <- paste0("(", sqlFieldNames, ")")
   if (is.null(port)) {
@@ -343,29 +341,4 @@ bulkLoadPostgres <- function(connection, sqlTableName, sqlFieldNames, sqlDataTyp
 
   delta <- Sys.time() - startTime
   inform(paste("Bulk load to PostgreSQL took", signif(delta, 3), attr(delta, "units")))
-}
-
-# Borrowed from devtools:
-# https://github.com/hadley/devtools/blob/ba7a5a4abd8258c52cb156e7b26bb4bf47a79f0b/R/utils.r#L44
-is_installed <- function(pkg, version = 0) {
-  installed_version <- tryCatch(utils::packageVersion(pkg), error = function(e) NA)
-  !is.na(installed_version) && installed_version >= version
-}
-
-# Borrowed and adapted from devtools:
-# https://github.com/hadley/devtools/blob/ba7a5a4abd8258c52cb156e7b26bb4bf47a79f0b/R/utils.r#L74
-ensure_installed <- function(pkg) {
-  if (!is_installed(pkg)) {
-    msg <- paste0(sQuote(pkg), " must be installed for this functionality.")
-    if (interactive()) {
-      message(msg, "\nWould you like to install it?")
-      if (menu(c("Yes", "No")) == 1) {
-        install.packages(pkg)
-      } else {
-        abort(msg)
-      }
-    } else {
-      abort(msg)
-    }
-  }
 }
