@@ -1,0 +1,7 @@
+library("devtools")
+build()
+install()
+Sys.setenv("DATABASECONNECTOR_JAR_FOLDER" = "../alp-clinical-research/alp-data-node/alp-dqd-svc/hana_drivers")
+conndec <- DatabaseConnector::createConnectionDetails(dbms = "hana", connectionString = "", user = "TENANT_WRITE_USER", password = "")
+conn <- DatabaseConnector::connect(conndec)
+DatabaseConnector::querySql(conn, "SELECT TOP 3 * FROM CDMSYNPUF1K.CONDITION_OCCURRENCE")

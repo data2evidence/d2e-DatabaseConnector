@@ -50,7 +50,7 @@ Suggests:
     pool,
     ParallelLogger
 License: Apache License
-VignetteBuilder: knitr
+# VignetteBuilder: knitr
 URL: https://ohdsi.github.io/DatabaseConnector/, https://github.com/OHDSI/DatabaseConnector
 BugReports: https://github.com/OHDSI/DatabaseConnector/issues
 Copyright: See file COPYRIGHTS
