@@ -35,12 +35,29 @@ checkIfDbmsIsSupported <- function(dbms) {
     "duckdb",
     "hana"
   )
+  deprecated <- c(
+    "hive",
+    "impala",
+    "netezza",
+    "pdw"
+  )
   if (!dbms %in% supportedDbmss) {
     abort(sprintf(
       "DBMS '%s' not supported. Please use one of these values: '%s'",
       dbms,
       paste(supportedDbmss, collapse = "', '")
     ))
+  }
+  if (dbms %in% deprecated) {
+    warn(sprintf(
+      paste(c("DBMS '%s' has been deprecated. Current functionality is provided as is.",
+            "No futher support will be provided.",
+            "Please consider switching to a different database platform."),
+            collapse = " "),
+      dbms),
+      .frequency = "regularly",
+      .frequency_id = "deprecated_dbms"
+    )
   }
 }
 
@@ -525,8 +542,8 @@ connectPostgreSql <- function(connectionDetails) {
 
 connectRedShift <- function(connectionDetails) {
   inform("Connecting using Redshift driver")
-  jarPath <- findPathToJar("^RedshiftJDBC.*\\.jar$", connectionDetails$pathToDriver)
-  if (grepl("RedshiftJDBC42", jarPath)) {
+  jarPath <- findPathToJar("^[Rr]edshift.*\\.jar$", connectionDetails$pathToDriver)
+  if (grepl("RedshiftJDBC42", jarPath) || grepl("redshift-jdbc42", jarPath)) {
     driver <- getJbcDriverSingleton("com.amazon.redshift.jdbc42.Driver", jarPath)
   } else {
     driver <- getJbcDriverSingleton("com.amazon.redshift.jdbc4.Driver", jarPath)
@@ -750,7 +767,8 @@ connectSnowflake <- function(connectionDetails) {
       user = connectionDetails$user(),
       password = connectionDetails$password(),
       dbms = connectionDetails$dbms,
-      "CLIENT_TIMESTAMP_TYPE_MAPPING"="TIMESTAMP_NTZ"
+      "CLIENT_TIMESTAMP_TYPE_MAPPING"="TIMESTAMP_NTZ",
+      "QUOTED_IDENTIFIERS_IGNORE_CASE"="TRUE"
     )
   }
   return(connection)
@@ -801,6 +819,14 @@ connectUsingJdbcDriver <- function(jdbcDriver,
       abort(paste0("Unable to connect JDBC to ", url, " (", rJava::.jcall(x, "S", "getMessage"), ")"))
     }
   }
+  ensureDatabaseConnectorConnectionClassExists()
+  class <- getClassDef("DatabaseConnectorJdbcConnection", where = class_cache, inherits = FALSE)
+  if (is.null(class) || methods::isVirtualClass(class)) {
+    setClass("DatabaseConnectorJdbcConnection",
+             contains = "DatabaseConnectorConnection", 
+             slots = list(jConnection = "jobjRef"),
+             where = class_cache)
+  }
   connection <- new("DatabaseConnectorJdbcConnection",
     jConnection = jConnection,
     identifierQuote = "",
@@ -813,10 +839,41 @@ connectUsingJdbcDriver <- function(jdbcDriver,
   return(connection)
 }
 
+ensureDatabaseConnectorConnectionClassExists <- function() {
+  class <- getClassDef("Microsoft SQL Server", where = class_cache, inherits = FALSE)
+  if (is.null(class) || methods::isVirtualClass(class)) {
+    setClass("Microsoft SQL Server",
+             where = class_cache)
+  }
+  class <- getClassDef("DatabaseConnectorConnection", where = class_cache, inherits = FALSE)
+  if (is.null(class) || methods::isVirtualClass(class)) {
+    setClass("DatabaseConnectorConnection", 
+             contains = c("Microsoft SQL Server", "DBIConnection"),
+             slots = list(
+               identifierQuote = "character",
+               stringQuote = "character",
+               dbms = "character",
+               uuid = "character"
+             ),
+             where = class_cache)
+  }
+}
+
 connectUsingDbi <- function(dbiConnectionDetails) {
   dbms <- dbiConnectionDetails$dbms
   dbiConnectionDetails$dbms <- NULL
   dbiConnection <- do.call(DBI::dbConnect, dbiConnectionDetails)
+  ensureDatabaseConnectorConnectionClassExists()
+  class <- getClassDef("DatabaseConnectorDbiConnection", where = class_cache, inherits = FALSE)
+  if (is.null(class) || methods::isVirtualClass(class)) {
+    setClass("DatabaseConnectorDbiConnection",
+             contains = "DatabaseConnectorConnection", 
+             slots = list(
+               dbiConnection = "DBIConnection",
+               server = "character"
+             ),
+             where = class_cache)
+  }
   connection <- new("DatabaseConnectorDbiConnection",
     server = dbms,
     dbiConnection = dbiConnection,

@@ -1,3 +1,51 @@
+DatabaseConnector 6.3.2
+=======================
+
+Bugfixes:
+
+1. Fixed bug caused in 6.3.1 when Andromeda is not installed.
+
+
+DatabaseConnector 6.3.1
+=======================
+
+Bugfixes:
+
+1. Fixed `dbFetch()` for DBI drivers, no longer ignoring `n` argument.
+
+2. Fix bulk import for Postgres on MacOs.
+
+
+DatabaseConnector 6.3.0
+=======================
+
+Changes:
+
+1. On Snowflake always using `QUOTED_IDENTIFIERS_IGNORE_CASE=TRUE` to avoid name mismatches when using quotes.
+
+2. Updated Redshift drivers.
+
+3. Added unit tests for all supported platforms.
+
+Bugfixes:
+
+1. Fix bug on BigQuery where wait time was too short to avoid rate limit error.
+
+
+DatabaseConnector 6.2.4
+=======================
+
+Changes:
+
+1. The `DatabaseConnectorConnection` class is now defined at runtime, preventing the "Found more than one class 'Microsoft SQL Server'" error when using the `odbc` package while `DatabaseConnector` is installed.
+
+Bugfixes:
+
+1. Fixing test for whether packages exist, which was causing errors on some Linux versions.
+
+2. Fixing error about missing origin when fetching datetimes on older R versions.
+
+
 DatabaseConnector 6.2.3
 =======================
 

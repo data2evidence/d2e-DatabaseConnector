@@ -68,11 +68,23 @@ scratchDatabaseSchemaDataBricks <- "scratch"
 connectionDetailsSnowflake <- createConnectionDetails(
   dbms = "snowflake",
   connectionString = keyring::key_get("snowflakeConnectionString"),
+  # connectionString = paste(keyring::key_get("snowflakeConnectionString"), "QUOTED_IDENTIFIERS_IGNORE_CASE=TRUE", sep="&"),
   user = keyring::key_get("snowflakeUser"),
   password = keyring::key_get("snowflakePassword")
 )
-cdmDatabaseSchemaSnowflake <- "ohdsi.eunomia"
-scratchDatabaseSchemaSnowflake <- "ohdsi.scratch"
+cdmDatabaseSchemaSnowflake <- "ATLAS.SYNPUF110K_CDM_53"
+scratchDatabaseSchemaSnowflake <- "ATLAS.RESULTS"
+
+# Snowflake
+connectionDetailsSnowflake <- createConnectionDetails(
+  dbms = "snowflake",
+  server = Sys.getenv("CDM_SNOWFLAKE_SERVER"),
+  user = Sys.getenv("CDM_SNOWFLAKE_USER"),
+  password = Sys.getenv("CDM_SNOWFLAKE_PASSWORD")
+)
+connection <- connect(connectionDetailsSnowflake)
+cdmDatabaseSchemaSnowflake <- "ATLAS.SYNPUF110K_CDM_53"
+scratchDatabaseSchemaSnowflake <- "ATLAS.RESULTS"
 
 # Open and close connection -----------------------------------------------
 
@@ -521,6 +533,67 @@ hash <- computeDataHash(connection = connection,
 expect_true(is.character(hash))
 disconnect(connection)
 
+# Test updates -----------------------------------------------------------------
+sql <- "CREATE TABLE #temp (x INT);
+    INSERT INTO #temp (x) SELECT 123;
+    DELETE FROM #temp WHERE x = 123;
+    DROP TABLE #temp;"
+
+# BigQuery 
+options(sqlRenderTempEmulationSchema = scratchDatabaseSchemaBigQuery)
+connection <- connect(connectionDetailsBigQuery)
+
+expect_equal(renderTranslateExecuteSql(connection, sql), c(0, 1, 1, 0))
+
+expect_equal(renderTranslateExecuteSql(connection, sql, runAsBatch = TRUE), c(0, 1, 1, 0))
+
+rowsAffected <- dbSendStatement(connection, sql)
+expect_equal(dbGetRowsAffected(rowsAffected), 2)
+dbClearResult(rowsAffected)
+
+disconnect(connection)
+
+# Azure 
+connection <- connect(connectionDetailsAzure)
+
+expect_equal(renderTranslateExecuteSql(connection, sql), c(0, 1, 1, 0))
+
+expect_equal(renderTranslateExecuteSql(connection, sql, runAsBatch = TRUE), c(0, 1, 1, 0))
+
+rowsAffected <- dbSendStatement(connection, sql)
+expect_equal(dbGetRowsAffected(rowsAffected), 2)
+dbClearResult(rowsAffected)
+
+disconnect(connection)
+
+# Databricks  JDBC
+options(sqlRenderTempEmulationSchema = scratchDatabaseSchemaDataBricks)
+connection <- connect(connectionDetailsDataBricksJdbc)
+
+expect_equal(renderTranslateExecuteSql(connection, sql), c(-1, -1, 0, -1))
+
+expect_equal(renderTranslateExecuteSql(connection, sql, runAsBatch = TRUE), c(-1, -1, 0, -1))
+
+rowsAffected <- dbSendStatement(connection, sql)
+expect_equal(dbGetRowsAffected(rowsAffected), -3)
+dbClearResult(rowsAffected)
+
+disconnect(connection)
+
+# Databricks  ODBC
+options(sqlRenderTempEmulationSchema = scratchDatabaseSchemaDataBricks)
+connection <- connect(connectionDetailsDataBricksOdbc)
+
+expect_equal(renderTranslateExecuteSql(connection, sql), c(0, 0, 0, 0))
+
+expect_equal(renderTranslateExecuteSql(connection, sql, runAsBatch = TRUE), c(0, 0, 0, 0))
+
+rowsAffected <- dbSendStatement(connection, sql)
+expect_equal(dbGetRowsAffected(rowsAffected), 0)
+dbClearResult(rowsAffected)
+
+disconnect(connection)
+
 # Test dbplyr ------------------------------------------------------------------
 
 source("tests/testthat/dbplyrTestFunction.R")
@@ -575,7 +648,15 @@ DataQualityDashboard::executeDqChecks(
   outputFile = "d:/temp/dqd/output.txt",
   writeToTable = FALSE
 )
-
+# Achilles ---------------------------------------------------------------------
+options(sqlRenderTempEmulationSchema = scratchDatabaseSchemaBigQuery)
+Achilles::achilles(
+  connectionDetails = connectionDetailsBigQuery,
+  cdmDatabaseSchema = cdmDatabaseSchemaBigQuery,
+  resultsDatabaseSchema = scratchDatabaseSchemaBigQuery,
+  sourceName = "Test",
+  cdmVersion = 5)
+  
 
 
 
@@ -688,10 +769,24 @@ disconnect(connection)
 
 # ODBC
 db <- DBI::dbConnect(odbc::odbc(),
-                     server = Sys.getenv("CDM5_SQL_SERVER_SERVER"),
-                     uid = Sys.getenv("CDM5_SQL_SERVER_USER"),
-                     pwd = URLdecode(Sys.getenv("CDM5_SQL_SERVER_PASSWORD")),
-                     driver = "SQL Server",
-                     Trusted_Connection=TRUE)
+                     Driver = "SQL Server",
+                     Server = Sys.getenv("CDM5_SQL_SERVER_SERVER"),
+                     Database = Sys.getenv("CDM5_SQL_SERVER_CDM_DATABASE"),
+                     UID = Sys.getenv("CDM5_SQL_SERVER_USER"),
+                     PWD = Sys.getenv("CDM5_SQL_SERVER_PASSWORD"),
+                     TrustServerCertificate = "yes",
+                     Port = 1433)
 
 
+# Quotes -----------------------------------------------------------------------
+connection <- connect(connectionDetailsBigQuery)
+renderTranslateQuerySql(connection, "SELECT TOP 1 \"person_id\" FROM @schema.person;", schema = cdmDatabaseSchemaBigQuery)
+
+querySql(connection, "SELECT \"PERSON_ID\" FROM ATLAS.SYNPUF110K_CDM_53.person LIMIT 1;")
+
+disconnect(connection)
+
+
+connection <- connect(connectionDetailsSnowflake)
+renderTranslateQuerySql(connection, "SELECT TOP 1 \"person_id\" FROM @schema.person;", schema = cdmDatabaseSchemaSnowflake)
+disconnect(connection)
