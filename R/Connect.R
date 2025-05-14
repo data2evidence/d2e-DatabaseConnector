@@ -364,7 +364,16 @@ connectHanaServer <- function(connectionDetails) {
       }
     }
 
-    if (is.null(connectionDetails$user()) || connectionDetails$user() == "") {
+    # JWT auth: user is empty, but password is a string
+    if ((is.null(connectionDetails$user()) || connectionDetails$user() == "") && 
+        (!is.null(connectionDetails$password()) && connectionDetails$password() != "")) {
+        connection <- connectUsingJdbcDriver(driver, 
+                                            connectionString, 
+                                            password=connectionDetails$password(),
+                                            dbms = connectionDetails$dbms
+        )
+    } else if ((is.null(connectionDetails$user()) || connectionDetails$user() == "") && 
+            (is.null(connectionDetails$password()) && connectionDetails$password() == "") ) {
         connection <- connectUsingJdbcDriver(driver, connectionString, dbms = connectionDetails$dbms)
     } else {
         connection <- connectUsingJdbcDriver(driver,
