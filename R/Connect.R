@@ -33,7 +33,8 @@ checkIfDbmsIsSupported <- function(dbms) {
     "snowflake",
     "synapse",
     "duckdb",
-    "hana"
+    "hana",
+    "trex_duckdb"
   )
   deprecated <- c(
     "hive",
@@ -300,7 +301,10 @@ connect <- function(connectionDetails = NULL,
       connectSqlite(connectionDetails)
     } else if (connectionDetails$dbms == "duckdb") {
       connectDuckdb(connectionDetails)
-    } else if (connectionDetails$dbms == "spark" && is.null(connectionDetails$connectionString())) {
+    } else if(connectionDetails$dbms == "trex_duckdb"){
+      connectUsingJdbc(connectionDetails)
+    } 
+    else if (connectionDetails$dbms == "spark" && is.null(connectionDetails$connectionString())) {
       connectSparkUsingOdbc(connectionDetails)
     } else {
       return(connectUsingJdbc(connectionDetails))
@@ -318,6 +322,8 @@ connectUsingJdbc <- function(connectionDetails) {
   } else if (dbms == "oracle") {
     return(connectOracle(connectionDetails))
   } else if (dbms == "postgresql") {
+    return(connectPostgreSql(connectionDetails))
+  } else if (dbms == "trex_duckdb") {
     return(connectPostgreSql(connectionDetails))
   } else if (dbms == "redshift") {
     return(connectRedShift(connectionDetails))
