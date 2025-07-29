@@ -125,10 +125,10 @@ public class BatchedQuery {
 		}
 	}
 	
-	public BatchedQuery(Connection connection, String query, String dbms) throws SQLException {
+	public BatchedQuery(Connection connection, String query, String dbms, boolean autoCommit) throws SQLException {
 		this.connection = connection;
 		this.dbms = dbms;
-		trySettingAutoCommit(false);
+		trySettingAutoCommit(autoCommit);
 		Statement statement = connection.createStatement(ResultSet.TYPE_FORWARD_ONLY, ResultSet.CONCUR_READ_ONLY);
 		statement.setFetchSize(FETCH_SIZE);
 		resultSet = statement.executeQuery(query);
@@ -163,6 +163,10 @@ public class BatchedQuery {
 		reserveMemory();
 		done = false;
 		totalRowCount = 0;
+	}
+
+	public BatchedQuery(Connection connection, String query, String dbms) throws SQLException {
+		this(connection, query, dbms, false);
 	}
 	
 	public void fetchBatch() throws SQLException {

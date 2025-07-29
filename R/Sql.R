@@ -170,6 +170,7 @@ lowLevelQuerySql.default <- function(connection,
                                      datesAsString = FALSE,
                                      integerAsNumeric = getOption("databaseConnectorIntegerAsNumeric", default = TRUE),
                                      integer64AsNumeric = getOption("databaseConnectorInteger64AsNumeric", default = TRUE)) {
+  logTrace("Using lowLevelQuerySql.default")
   if (rJava::is.jnull(connection@jConnection)) {
     abort("Connection is closed")
   }
@@ -181,7 +182,8 @@ lowLevelQuerySql.default <- function(connection,
     "org.ohdsi.databaseConnector.BatchedQuery",
     connection@jConnection,
     query,
-    dbms(connection)
+    dbms(connection),
+    TRUE
   )
   
   on.exit(rJava::.jcall(batchedQuery, "V", "clear"))
@@ -219,6 +221,7 @@ lowLevelQuerySql.DatabaseConnectorDbiConnection <- function(connection,
                                                             datesAsString = FALSE,
                                                             integerAsNumeric = getOption("databaseConnectorIntegerAsNumeric", default = TRUE),
                                                             integer64AsNumeric = getOption("databaseConnectorInteger64AsNumeric", default = TRUE)) {
+  logTrace("Using lowLevelQuerySql.DatabaseConnectorDbiConnection")
   logTrace(paste("Querying SQL:", truncateSql(query)))
   startTime <- Sys.time()
   
