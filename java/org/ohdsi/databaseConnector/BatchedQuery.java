@@ -165,9 +165,6 @@ public class BatchedQuery {
 		totalRowCount = 0;
 	}
 
-	public BatchedQuery(Connection connection, String query, String dbms) throws SQLException {
-		this(connection, query, dbms, false);
-	}
 	
 	public void fetchBatch() throws SQLException {
 		cleanUpStrings();
