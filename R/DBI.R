@@ -229,7 +229,8 @@ setMethod(
         "org.ohdsi.databaseConnector.BatchedQuery",
         conn@jConnection,
         statement,
-        dbms
+        dbms,
+        FALSE
       ),
       error = function(error) {
         # Rethrowing error to avoid 'no field, method or inner class called 'use_cli_format''

@@ -79,7 +79,8 @@ lowLevelQuerySqlToAndromeda.default <- function(connection,
     "org.ohdsi.databaseConnector.BatchedQuery",
     connection@jConnection,
     query,
-    dbms(connection)
+    dbms(connection),
+    FALSE
   )
   
   on.exit(rJava::.jcall(batchedQuery, "V", "clear"))
