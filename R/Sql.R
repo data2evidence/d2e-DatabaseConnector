@@ -170,7 +170,6 @@ lowLevelQuerySql.default <- function(connection,
                                      datesAsString = FALSE,
                                      integerAsNumeric = getOption("databaseConnectorIntegerAsNumeric", default = TRUE),
                                      integer64AsNumeric = getOption("databaseConnectorInteger64AsNumeric", default = TRUE)) {
-  logTrace("Using lowLevelQuerySql.default")
   if (rJava::is.jnull(connection@jConnection)) {
     abort("Connection is closed")
   }
@@ -221,7 +220,6 @@ lowLevelQuerySql.DatabaseConnectorDbiConnection <- function(connection,
                                                             datesAsString = FALSE,
                                                             integerAsNumeric = getOption("databaseConnectorIntegerAsNumeric", default = TRUE),
                                                             integer64AsNumeric = getOption("databaseConnectorInteger64AsNumeric", default = TRUE)) {
-  logTrace("Using lowLevelQuerySql.DatabaseConnectorDbiConnection")
   logTrace(paste("Querying SQL:", truncateSql(query)))
   startTime <- Sys.time()
   
