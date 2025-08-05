@@ -134,8 +134,8 @@ public class BatchedInsert {
 				statement.addBatch();
 			}
 			statement.executeBatch();
-			if (!dbms.equals(SPARK))
-				connection.commit();
+			// if (!dbms.equals(SPARK))
+			// 	connection.commit();
 			statement.close();
 			connection.clearWarnings();
 			trySettingAutoCommit(true);
