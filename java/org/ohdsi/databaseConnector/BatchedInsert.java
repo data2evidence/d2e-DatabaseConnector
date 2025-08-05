@@ -126,7 +126,7 @@ public class BatchedInsert {
 	
 		checkColumns();
 		try {
-			trySettingAutoCommit(false);
+			trySettingAutoCommit(true);
 			PreparedStatement statement = connection.prepareStatement(sql);
 			for (int i = 0; i < rowCount; i++) {
 				for (int j = 0; j < columnCount; j++)
