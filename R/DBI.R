@@ -230,7 +230,7 @@ setMethod(
         conn@jConnection,
         statement,
         dbms,
-        FALSE
+        TRUE
       ),
       error = function(error) {
         # Rethrowing error to avoid 'no field, method or inner class called 'use_cli_format''

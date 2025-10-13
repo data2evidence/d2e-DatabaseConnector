@@ -80,7 +80,7 @@ lowLevelQuerySqlToAndromeda.default <- function(connection,
     connection@jConnection,
     query,
     dbms(connection),
-    FALSE
+    TRUE
   )
   
   on.exit(rJava::.jcall(batchedQuery, "V", "clear"))
@@ -253,6 +253,7 @@ querySqlToAndromeda <- function(connection,
   }
   tryCatch(
     {
+      sprintf("Executing Andromeda query: %s", sqlStatements[1])
       andromeda <- lowLevelQuerySqlToAndromeda(
         connection = connection,
         query = sqlStatements[1],
