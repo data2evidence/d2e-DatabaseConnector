@@ -378,6 +378,7 @@ insertTable.default <- function(connection,
             inform(paste(sprintf("is.character(column): %s", is.character(column))))
             inform(paste(sprintf("Inserting column %d as string", i)))
             column <- escapeJson(column)
+            inform(paste(sprintf("Column: %s", column)))
             rJava::.jcall(batchedInsert, "V", "setString", i, column)
           }
           return(NULL)
