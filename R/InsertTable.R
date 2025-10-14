@@ -345,7 +345,6 @@ insertTable.default <- function(connection,
       if (progressBar) {
         pb <- txtProgressBar(style = 3)
       }
-      sprintf("Inserting %d rows in batches of %d", nrow(data), batchSize)
       inform(paste(sprintf("Inserting %d rows in batches of %d", nrow(data), batchSize)))
       batchedInsert <- rJava::.jnew(
         "org.ohdsi.databaseConnector.BatchedInsert",
@@ -376,9 +375,10 @@ insertTable.default <- function(connection,
           } else if (is(column, "Date")) {
             rJava::.jcall(batchedInsert, "V", "setDate", i, as.character(column))
           } else {
-            logTrace(paste("Inserting column", i, "as string"))
+            inform(paste(sprintf("is.character(column): %s", is.character(column))))
             inform(paste(sprintf("Inserting column %d as string", i)))
-            rJava::.jcall(batchedInsert, "V", "setString", i, as.character(column))
+            column <- escapeJson(column)
+            rJava::.jcall(batchedInsert, "V", "setString", i, column)
           }
           return(NULL)
         }
@@ -497,4 +497,11 @@ convertLogicalFields <- function(data) {
     }
   }
   return(data)
+}
+
+escapeJson <- function(json) {
+  json <- gsub("\\", "\\\\", json, fixed = TRUE)  # Escape backslashes
+  json <- gsub("\"", "\\\"", json, fixed = TRUE)  # Escape double quotes
+  json <- gsub("\n", "\\n", json, fixed = TRUE)  # Escape newlines
+  return(json)
 }
