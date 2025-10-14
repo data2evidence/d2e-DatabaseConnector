@@ -501,8 +501,9 @@ convertLogicalFields <- function(data) {
 }
 
 escapeJson <- function(json) {
-  json <- gsub("\\", "\\\\", json, fixed = TRUE)  # Escape backslashes
+  json <- gsub("'", "''", json, fixed = TRUE)  # Escape single quotes
   json <- gsub("\"", "\\\"", json, fixed = TRUE)  # Escape double quotes
   json <- gsub("\n", "\\n", json, fixed = TRUE)  # Escape newlines
+  json <- gsub("\r", "\\r", json, fixed = TRUE)  # Escape carriage returns
   return(json)
 }
