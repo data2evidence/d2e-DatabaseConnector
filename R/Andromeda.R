@@ -230,8 +230,8 @@ querySqlToAndromeda <- function(connection,
                                                                default = TRUE
                                 )) {
 
-  sprintf("Executing Andromeda query: %s", sqlStatements[1])
-  logTrace(paste("Executing Andromeda query: %s", sqlStatements[1]))
+  sprintf("Executing Andromeda query")
+  logTrace(paste("Executing Andromeda query"))
   if (inherits(
     connection,
     "DatabaseConnectorJdbcConnection"
