@@ -200,6 +200,8 @@ insertTable.default <- function(connection,
                                 camelCaseToSnakeCase = FALSE) {
 
   sprintf("insertTable.default called with dbms = %s", dbms(connection))
+  logTrace(paste("insertTable.default called with dbms = %s", dbms(connection)))
+  inform(paste(sprintf("insertTable.default called with dbms = %s", dbms(connection))))
 
   if (is(connection, "Pool")) {
     connection <- pool::poolCheckout(connection)
@@ -338,11 +340,13 @@ insertTable.default <- function(connection,
     )
     batchSize <- 10000
     sprintf("Insert Query: %s", insertSql)
+    inform(paste(sprintf("Insert Query: %s", insertSql)))
     if (nrow(data) > 0) {
       if (progressBar) {
         pb <- txtProgressBar(style = 3)
       }
       sprintf("Inserting %d rows in batches of %d", nrow(data), batchSize)
+      inform(paste(sprintf("Inserting %d rows in batches of %d", nrow(data), batchSize)))
       batchedInsert <- rJava::.jnew(
         "org.ohdsi.databaseConnector.BatchedInsert",
         connection@jConnection,
@@ -372,6 +376,8 @@ insertTable.default <- function(connection,
           } else if (is(column, "Date")) {
             rJava::.jcall(batchedInsert, "V", "setDate", i, as.character(column))
           } else {
+            logTrace(paste("Inserting column", i, "as string"))
+            inform(paste(sprintf("Inserting column %d as string", i)))
             rJava::.jcall(batchedInsert, "V", "setString", i, as.character(column))
           }
           return(NULL)
@@ -406,6 +412,8 @@ insertTable.DatabaseConnectorDbiConnection <- function(connection,
                                                        progressBar = FALSE,
                                                        camelCaseToSnakeCase = FALSE) {
   sprintf("insertTable.DatabaseConnectorDbiConnection called")
+  logTrace(paste("insertTable.DatabaseConnectorDbiConnection called"))
+
   if (!is.null(oracleTempSchema) && oracleTempSchema != "") {
     warn("The 'oracleTempSchema' argument is deprecated. Use 'tempEmulationSchema' instead.",
          .frequency = "regularly",
