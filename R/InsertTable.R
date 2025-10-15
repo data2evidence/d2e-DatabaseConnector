@@ -412,8 +412,6 @@ insertTable.DatabaseConnectorDbiConnection <- function(connection,
                                                        useMppBulkLoad = Sys.getenv("USE_MPP_BULK_LOAD"),
                                                        progressBar = FALSE,
                                                        camelCaseToSnakeCase = FALSE) {
-  sprintf("insertTable.DatabaseConnectorDbiConnection called")
-  logTrace(paste("insertTable.DatabaseConnectorDbiConnection called"))
 
   if (!is.null(oracleTempSchema) && oracleTempSchema != "") {
     warn("The 'oracleTempSchema' argument is deprecated. Use 'tempEmulationSchema' instead.",
@@ -502,8 +500,9 @@ convertLogicalFields <- function(data) {
 
 escapeJson <- function(json) {
   json <- gsub("'", "''", json, fixed = TRUE)  # Escape single quotes
-  json <- gsub("\"", "\\\"", json, fixed = TRUE)  # Escape double quotes
-  json <- gsub("\n", "\\n", json, fixed = TRUE)  # Escape newlines
-  json <- gsub("\r", "\\r", json, fixed = TRUE)  # Escape carriage returns
+  json <- gsub(";", "", json, fixed = TRUE) # Remove semicolons
+  # json <- gsub("\"", "\\\"", json, fixed = TRUE)  # Escape double quotes
+  # json <- gsub("\n", "\\n", json, fixed = TRUE)  # Escape newlines
+  # json <- gsub("\r", "\\r", json, fixed = TRUE)  # Escape carriage returns
   return(json)
 }
