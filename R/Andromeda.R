@@ -229,9 +229,6 @@ querySqlToAndromeda <- function(connection,
                                 integer64AsNumeric = getOption("databaseConnectorInteger64AsNumeric",
                                                                default = TRUE
                                 )) {
-
-  sprintf("Executing Andromeda query")
-  logTrace(paste("Executing Andromeda query"))
   if (inherits(
     connection,
     "DatabaseConnectorJdbcConnection"
@@ -244,7 +241,6 @@ querySqlToAndromeda <- function(connection,
   if (packageVersion("Andromeda") < "0.6.0") {
     stop(sprintf("Andromeda version 0.6.0 or higher required, but version %s found", packageVersion("Andromeda")))
   }
-  sprintf("Executing Andromeda query: %s", sql)
   # Calling splitSql, because this will also strip trailing semicolons (which cause Oracle to crash).
   sqlStatements <- SqlRender::splitSql(sql)
   if (length(sqlStatements) > 1) {
@@ -256,8 +252,6 @@ querySqlToAndromeda <- function(connection,
   }
   tryCatch(
     {
-      logTrace(paste("Querying SQL:", sqlStatements[1]))
-      sprintf("Executing Andromeda query: %s", sqlStatements[1])
       andromeda <- lowLevelQuerySqlToAndromeda(
         connection = connection,
         query = sqlStatements[1],

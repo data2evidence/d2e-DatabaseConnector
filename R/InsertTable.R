@@ -199,10 +199,6 @@ insertTable.default <- function(connection,
                                 progressBar = FALSE,
                                 camelCaseToSnakeCase = FALSE) {
 
-  sprintf("insertTable.default called with dbms = %s", dbms(connection))
-  logTrace(paste("insertTable.default called with dbms = %s", dbms(connection)))
-  inform(paste(sprintf("insertTable.default called with dbms = %s", dbms(connection))))
-
   if (is(connection, "Pool")) {
     connection <- pool::poolCheckout(connection)
     on.exit(pool::poolReturn(connection))
@@ -339,13 +335,10 @@ insertTable.default <- function(connection,
                                       tempEmulationSchema = tempEmulationSchema
     )
     batchSize <- 10000
-    sprintf("Insert Query: %s", insertSql)
-    inform(paste(sprintf("Insert Query: %s", insertSql)))
     if (nrow(data) > 0) {
       if (progressBar) {
         pb <- txtProgressBar(style = 3)
       }
-      inform(paste(sprintf("Inserting %d rows in batches of %d", nrow(data), batchSize)))
       batchedInsert <- rJava::.jnew(
         "org.ohdsi.databaseConnector.BatchedInsert",
         connection@jConnection,
@@ -375,10 +368,7 @@ insertTable.default <- function(connection,
           } else if (is(column, "Date")) {
             rJava::.jcall(batchedInsert, "V", "setDate", i, as.character(column))
           } else {
-            inform(paste(sprintf("is.character(column): %s", is.character(column))))
-            inform(paste(sprintf("Inserting column %d as string", i)))
             column <- escapeJson(column)
-            inform(paste(sprintf("Column: %s", column)))
             rJava::.jcall(batchedInsert, "V", "setString", i, column)
           }
           return(NULL)
@@ -430,7 +420,6 @@ insertTable.DatabaseConnectorDbiConnection <- function(connection,
   isSqlReservedWord(c(tableName, colnames(data)), warn = TRUE)
   
   tableName <- gsub("^#", "", tableName)
-  sprintf("dbms = %s", dbms(connection))
   if (dbms(connection) == "sqlite") {
     # Convert dates and datetime to UNIX timestamp:
     for (i in 1:ncol(data)) {
@@ -501,8 +490,5 @@ convertLogicalFields <- function(data) {
 escapeJson <- function(json) {
   json <- gsub("'", "''", json, fixed = TRUE)  # Escape single quotes
   json <- gsub(";", "", json, fixed = TRUE) # Remove semicolons
-  # json <- gsub("\"", "\\\"", json, fixed = TRUE)  # Escape double quotes
-  # json <- gsub("\n", "\\n", json, fixed = TRUE)  # Escape newlines
-  # json <- gsub("\r", "\\r", json, fixed = TRUE)  # Escape carriage returns
   return(json)
 }
