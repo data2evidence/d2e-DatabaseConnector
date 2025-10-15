@@ -128,7 +128,7 @@ public class BatchedQuery {
 	public BatchedQuery(Connection connection, String query, String dbms, boolean autoCommit) throws SQLException {
 		this.connection = connection;
 		this.dbms = dbms;
-		trySettingAutoCommit(true);
+		trySettingAutoCommit(autoCommit);
 		Statement statement = connection.createStatement(ResultSet.TYPE_FORWARD_ONLY, ResultSet.CONCUR_READ_ONLY);
 		statement.setFetchSize(FETCH_SIZE);
 		resultSet = statement.executeQuery(query);
