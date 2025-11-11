@@ -80,7 +80,7 @@ lowLevelQuerySqlToAndromeda.default <- function(connection,
     connection@jConnection,
     query,
     dbms(connection),
-    FALSE
+    TRUE
   )
   
   on.exit(rJava::.jcall(batchedQuery, "V", "clear"))
@@ -241,7 +241,6 @@ querySqlToAndromeda <- function(connection,
   if (packageVersion("Andromeda") < "0.6.0") {
     stop(sprintf("Andromeda version 0.6.0 or higher required, but version %s found", packageVersion("Andromeda")))
   }
-  
   # Calling splitSql, because this will also strip trailing semicolons (which cause Oracle to crash).
   sqlStatements <- SqlRender::splitSql(sql)
   if (length(sqlStatements) > 1) {

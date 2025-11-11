@@ -198,6 +198,7 @@ insertTable.default <- function(connection,
                                 useMppBulkLoad = Sys.getenv("USE_MPP_BULK_LOAD"),
                                 progressBar = FALSE,
                                 camelCaseToSnakeCase = FALSE) {
+
   if (is(connection, "Pool")) {
     connection <- pool::poolCheckout(connection)
     on.exit(pool::poolReturn(connection))
@@ -334,7 +335,6 @@ insertTable.default <- function(connection,
                                       tempEmulationSchema = tempEmulationSchema
     )
     batchSize <- 10000
-    
     if (nrow(data) > 0) {
       if (progressBar) {
         pb <- txtProgressBar(style = 3)
@@ -368,7 +368,8 @@ insertTable.default <- function(connection,
           } else if (is(column, "Date")) {
             rJava::.jcall(batchedInsert, "V", "setDate", i, as.character(column))
           } else {
-            rJava::.jcall(batchedInsert, "V", "setString", i, as.character(column))
+            column <- escapeJson(column)
+            rJava::.jcall(batchedInsert, "V", "setString", i, column)
           }
           return(NULL)
         }
@@ -401,6 +402,7 @@ insertTable.DatabaseConnectorDbiConnection <- function(connection,
                                                        useMppBulkLoad = Sys.getenv("USE_MPP_BULK_LOAD"),
                                                        progressBar = FALSE,
                                                        camelCaseToSnakeCase = FALSE) {
+
   if (!is.null(oracleTempSchema) && oracleTempSchema != "") {
     warn("The 'oracleTempSchema' argument is deprecated. Use 'tempEmulationSchema' instead.",
          .frequency = "regularly",
@@ -483,4 +485,10 @@ convertLogicalFields <- function(data) {
     }
   }
   return(data)
+}
+
+escapeJson <- function(json) {
+  json <- gsub("'", "''", json, fixed = TRUE)  # Escape single quotes
+  json <- gsub(";", "", json, fixed = TRUE) # Remove semicolons
+  return(json)
 }

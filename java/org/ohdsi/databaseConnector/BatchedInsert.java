@@ -156,7 +156,7 @@ public class BatchedInsert {
 	private boolean executeBigQueryBatch() throws SQLException, ParseException {
 		checkColumns();
 		try {
-			trySettingAutoCommit(false);
+			trySettingAutoCommit(true);
 			
 			int offset = 0;
 			while (offset < rowCount) {
