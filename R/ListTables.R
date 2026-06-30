@@ -74,6 +74,14 @@ setMethod(
         schema <- cleanSchemaName(databaseSchema[2])
       }
     }
+    if (Sys.getenv("trex_connection", unset = NA) == "true" && is.character(schema)) {
+      sql <- SqlRender::render(
+        "SELECT table_name FROM information_schema.tables WHERE table_schema = '@schema';",
+        schema = schema
+      )
+      sql <- SqlRender::translate(sql, targetDialect = dbms(conn))
+      return(tolower(querySql(conn, sql)[[1]]))
+    }
     metaData <- rJava::.jcall(conn@jConnection, "Ljava/sql/DatabaseMetaData;", "getMetaData")
     types <- rJava::.jarray(c("TABLE", "VIEW", "EXTERNAL TABLE"))
     resultSet <- rJava::.jcall(metaData,
