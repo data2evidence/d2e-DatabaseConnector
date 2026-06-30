@@ -74,7 +74,7 @@ setMethod(
         schema <- cleanSchemaName(databaseSchema[2])
       }
     }
-    if (Sys.getenv("trex_connection", unset = NA) == "true" && !is.null(databaseSchema)) {
+    if (Sys.getenv("trex_connection", unset = NA) == "true" && is.character(schema)) {
       sql <- SqlRender::render(
         "SELECT table_name FROM information_schema.tables WHERE table_schema = '@schema';",
         schema = schema
