@@ -1,6 +1,4 @@
-# @file InsertTable.R
-#
-# Copyright 2023 Observational Health Data Sciences and Informatics
+# Copyright 2026 Observational Health Data Sciences and Informatics
 #
 # This file is part of DatabaseConnector
 #
@@ -16,7 +14,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-getSqlDataTypes <- function(column) {
+getSqlDataTypes <- function(column, dbms) { 
   if (is.integer(column)) {
     return("INTEGER")
   } else if (is(column, "POSIXct") | is(column, "POSIXt")) {
@@ -27,6 +25,13 @@ getSqlDataTypes <- function(column) {
     return("BIGINT")
   } else if (is.numeric(column)) {
     return("FLOAT")
+  } else if (is.logical(column)) {
+    return(switch(
+      dbms,
+      "sql server" = "BIT",
+      "oracle" = "NUMBER(1)", # could also consider `NUMBER(1)` possibly with constraint `COLNAME NUMBER(1) CHECK (COLNAME IN (0, 1))`
+      "BOOLEAN"
+    ))
   } else {
     if (is.factor(column)) {
       maxLength <-
@@ -121,6 +126,17 @@ validateInt64Insert <- function() {
 #' "some_aws_region", "AWS_BUCKET_NAME" = "some_bucket_name", "AWS_OBJECT_KEY" = "some_object_key",
 #' "AWS_SSE_TYPE" = "server_side_encryption_type").
 #'
+#' Spark (DataBricks): The MPP bulk loading relies upon the AzureStor library
+#' to test a connection to an Azure ADLS Gen2 storage container using Azure credentials. 
+#' Credentials are configured directly into the System Environment using the 
+#' following keys: Sys.setenv("AZR_STORAGE_ACCOUNT" =
+#' "some_azure_storage_account", "AZR_ACCOUNT_KEY" = "some_secret_account_key", "AZR_CONTAINER_NAME" =
+#' "some_container_name"). Prerequisites for Azure Databricks instances: Create an Access Connector 
+#' for Azure Databricks to provide a secure bridge between Unity Catalog and Azure Data Lake 
+#' Storage (ADLS Gen2), create the required storage credentials using the access connector, 
+#' and configure the bulk-loading storage account as an external location using the access 
+#' connector and storage credentials.
+#'
 #' PDW: The MPP bulk loading relies upon the client
 #' having a Windows OS and the DWLoader exe installed, and the following permissions granted: --Grant
 #' BULK Load permissions - needed at a server level USE master; GRANT ADMINISTER BULK OPERATIONS TO
@@ -175,7 +191,6 @@ insertTable <- function(connection,
                         dropTableIfExists = TRUE,
                         createTable = TRUE,
                         tempTable = FALSE,
-                        oracleTempSchema = NULL,
                         tempEmulationSchema = getOption("sqlRenderTempEmulationSchema"),
                         bulkLoad = Sys.getenv("DATABASE_CONNECTOR_BULK_UPLOAD"),
                         useMppBulkLoad = Sys.getenv("USE_MPP_BULK_LOAD"),
@@ -185,20 +200,18 @@ insertTable <- function(connection,
 }
 
 #' @export
-insertTable.default <- function(connection,
-                                databaseSchema = NULL,
-                                tableName,
-                                data,
-                                dropTableIfExists = TRUE,
-                                createTable = TRUE,
-                                tempTable = FALSE,
-                                oracleTempSchema = NULL,
-                                tempEmulationSchema = getOption("sqlRenderTempEmulationSchema"),
-                                bulkLoad = Sys.getenv("DATABASE_CONNECTOR_BULK_UPLOAD"),
-                                useMppBulkLoad = Sys.getenv("USE_MPP_BULK_LOAD"),
-                                progressBar = FALSE,
-                                camelCaseToSnakeCase = FALSE) {
-
+insertTable.DatabaseConnectorJdbcConnection <- function(connection,
+                                                       databaseSchema = NULL,
+                                                       tableName,
+                                                       data,
+                                                       dropTableIfExists = TRUE,
+                                                       createTable = TRUE,
+                                                       tempTable = FALSE,
+                                                       tempEmulationSchema = getOption("sqlRenderTempEmulationSchema"),
+                                                       bulkLoad = Sys.getenv("DATABASE_CONNECTOR_BULK_UPLOAD"),
+                                                       useMppBulkLoad = Sys.getenv("USE_MPP_BULK_LOAD"),
+                                                       progressBar = FALSE,
+                                                       camelCaseToSnakeCase = FALSE) {
   if (is(connection, "Pool")) {
     connection <- pool::poolCheckout(connection)
     on.exit(pool::poolReturn(connection))
@@ -212,13 +225,7 @@ insertTable.default <- function(connection,
     bulkLoad <- useMppBulkLoad
   }
   bulkLoad <- (!is.null(bulkLoad) && bulkLoad == "TRUE")
-  if (!is.null(oracleTempSchema) && oracleTempSchema != "") {
-    warn("The 'oracleTempSchema' argument is deprecated. Use 'tempEmulationSchema' instead.",
-         .frequency = "regularly",
-         .frequency_id = "oracleTempSchema"
-    )
-    tempEmulationSchema <- oracleTempSchema
-  }
+  
   if (is_installed("Andromeda") && Andromeda::isAndromedaTable(data)) {
     warn("Batch-wise uploading of Andromeda tables currently not supported. Loading entire table in memory.",
          .frequency = "regularly",
@@ -226,6 +233,7 @@ insertTable.default <- function(connection,
     )
     data <- as.data.frame(data)
   }
+  data <- convertIdateToDate(data)
   if (camelCaseToSnakeCase) {
     colnames(data) <- SqlRender::camelCaseToSnakeCase(colnames(data))
   }
@@ -237,7 +245,13 @@ insertTable.default <- function(connection,
     createTable <- TRUE
   }
   if (tempTable & substr(tableName, 1, 1) != "#" & dbms != "redshift") {
-    tableName <- paste("#", tableName, sep = "")
+    if (startsWith(tableName, "\"")) {
+      tableName <- paste0("\"#", substr(tableName, 2, nchar(tableName)))
+    } else if (startsWith(tableName, "`")) {
+      tableName <- paste0("`#", substr(tableName, 2, nchar(tableName)))
+    } else {
+      tableName <- paste0("#", tableName)
+    }
   }
   if (!is.null(databaseSchema)) {
     tableName <- paste(databaseSchema, tableName, sep = ".")
@@ -258,16 +272,14 @@ insertTable.default <- function(connection,
       data <- as.data.frame(data)
     }
   }
-  data <- convertLogicalFields(data)
   isSqlReservedWord(c(tableName, colnames(data)), warn = TRUE)
-  useBulkLoad <- (bulkLoad && dbms %in% c("hive", "redshift") && createTable) ||
+  useBulkLoad <- (bulkLoad && dbms %in% c("hive", "redshift", "spark") && createTable) ||
     (bulkLoad && dbms %in% c("pdw", "postgresql") && !tempTable)
   useCtasHack <- dbms %in% c("pdw", "redshift", "bigquery", "hive") && createTable && nrow(data) > 0 && !useBulkLoad
   if (dbms == "bigquery" && useCtasHack && is.null(tempEmulationSchema)) {
     abort("tempEmulationSchema is required to use insertTable with bigquery when inserting into a new table")
   }
-  
-  sqlDataTypes <- sapply(data, getSqlDataTypes)
+  sqlDataTypes <- sapply(data, getSqlDataTypes, dbms = dbms)
   sqlTableDefinition <- paste(.sql.qescape(names(data), TRUE), sqlDataTypes, collapse = ", ")
   sqlTableName <- .sql.qescape(tableName, TRUE, quote = "")
   sqlFieldNames <- paste(.sql.qescape(names(data), TRUE), collapse = ",")
@@ -285,7 +297,9 @@ insertTable.default <- function(connection,
   }
   
   if (createTable && !useCtasHack && !(bulkLoad && dbms == "hive")) {
+    
     sql <- paste("CREATE TABLE ", sqlTableName, " (", sqlTableDefinition, ");", sep = "")
+    
     renderTranslateExecuteSql(
       connection = connection,
       sql = sql,
@@ -309,10 +323,14 @@ insertTable.default <- function(connection,
       bulkLoadHive(connection, sqlTableName, sqlFieldNames, data)
     } else if (dbms == "postgresql") {
       bulkLoadPostgres(connection, sqlTableName, sqlFieldNames, sqlDataTypes, data)
+    } else if (dbms == "spark") {
+      bulkLoadSpark(connection, sqlTableName, data)
     }
   } else if (useCtasHack) {
     # Inserting using CTAS hack ----------------------------------------------------------------
     ctasHack(connection, sqlTableName, tempTable, sqlFieldNames, sqlDataTypes, data, progressBar, tempEmulationSchema)
+  } else if (dbms == "spark") {
+    multiValuesInsert(connection, sqlTableName, sqlFieldNames, sqlDataTypes, data, progressBar, tempEmulationSchema)
   } else {
     # Inserting using SQL inserts --------------------------------------------------------------
     logTrace(sprintf("Inserting %d rows into table '%s'", nrow(data), sqlTableName))
@@ -367,6 +385,10 @@ insertTable.default <- function(connection,
             rJava::.jcall(batchedInsert, "V", "setDateTime", i, format(column, format="%Y-%m-%d %H:%M:%S"))
           } else if (is(column, "Date")) {
             rJava::.jcall(batchedInsert, "V", "setDate", i, as.character(column))
+          } else  if (is.logical(column)) {
+            # encode column as -1 (NA), 1 (TRUE), 0 (FALSE) to pass logical NAs into Java 
+            column <- vapply(as.integer(column), FUN = function(x) ifelse(is.na(x), -1L, x), FUN.VALUE = integer(1L))
+            rJava::.jcall(batchedInsert, "V", "setBoolean", i, column)
           } else {
             column <- escapeJson(column)
             rJava::.jcall(batchedInsert, "V", "setString", i, column)
@@ -396,20 +418,41 @@ insertTable.DatabaseConnectorDbiConnection <- function(connection,
                                                        dropTableIfExists = TRUE,
                                                        createTable = TRUE,
                                                        tempTable = FALSE,
-                                                       oracleTempSchema = NULL,
                                                        tempEmulationSchema = getOption("sqlRenderTempEmulationSchema"),
                                                        bulkLoad = Sys.getenv("DATABASE_CONNECTOR_BULK_UPLOAD"),
                                                        useMppBulkLoad = Sys.getenv("USE_MPP_BULK_LOAD"),
                                                        progressBar = FALSE,
                                                        camelCaseToSnakeCase = FALSE) {
+  insertTable(
+    connection = connection@dbiConnection,
+    databaseSchema = databaseSchema,
+    tableName = tableName,
+    data = data,
+    dropTableIfExists = dropTableIfExists,
+    createTable = createTable,
+    tempTable = tempTable,
+    tempEmulationSchema = tempEmulationSchema,
+    bulkLoad = bulkLoad,
+    useMppBulkLoad = useMppBulkLoad,
+    progressBar = progressBar,
+    camelCaseToSnakeCase = camelCaseToSnakeCase
+  )
+}
 
-  if (!is.null(oracleTempSchema) && oracleTempSchema != "") {
-    warn("The 'oracleTempSchema' argument is deprecated. Use 'tempEmulationSchema' instead.",
-         .frequency = "regularly",
-         .frequency_id = "oracleTempSchema"
-    )
-    tempEmulationSchema <- oracleTempSchema
-  }
+#' @export
+insertTable.default <- function(connection,
+                                databaseSchema = NULL,
+                                tableName,
+                                data,
+                                dropTableIfExists = TRUE,
+                                createTable = TRUE,
+                                tempTable = FALSE,
+                                tempEmulationSchema = getOption("sqlRenderTempEmulationSchema"),
+                                bulkLoad = Sys.getenv("DATABASE_CONNECTOR_BULK_UPLOAD"),
+                                useMppBulkLoad = Sys.getenv("USE_MPP_BULK_LOAD"),
+                                progressBar = FALSE,
+                                camelCaseToSnakeCase = FALSE) {
+  data <- convertIdateToDate(data)
   if (camelCaseToSnakeCase) {
     colnames(data) <- SqlRender::camelCaseToSnakeCase(colnames(data))
   }
@@ -446,7 +489,6 @@ insertTable.DatabaseConnectorDbiConnection <- function(connection,
     }
     
   }
-  data <- convertLogicalFields(data)
   
   logTrace(sprintf("Inserting %d rows into table '%s' ", nrow(data), tableName))
   if (!is.null(databaseSchema)) {
@@ -463,7 +505,7 @@ insertTable.DatabaseConnectorDbiConnection <- function(connection,
   
   startTime <- Sys.time()
   DBI::dbWriteTable(
-    conn = connection@dbiConnection,
+    conn = connection,
     name = tableName,
     value = data,
     overwrite = dropTableIfExists,
@@ -475,16 +517,13 @@ insertTable.DatabaseConnectorDbiConnection <- function(connection,
   invisible(NULL)
 }
 
-convertLogicalFields <- function(data) {
-  for (i in 1:ncol(data)) {
-    column <- data[[i]]
-    if (is.logical(column)) {
-      warn(sprintf("Column '%s' is of type 'logical', but this is not supported by many DBMSs. Converting to numeric (1 = TRUE, 0 = FALSE)", 
-                   colnames(data)[i]))
-      data[, i] <- as.integer(column)
-    }
+convertIdateToDate <- function(df) {
+  isIdate <- vapply(df, function(x) inherits(x, "IDate"), logical(1))
+  if (!any(isIdate)) {
+    return(df)
   }
-  return(data)
+  df[isIdate] <- lapply(df[isIdate], as.Date)
+  return(df)
 }
 
 escapeJson <- function(json) {

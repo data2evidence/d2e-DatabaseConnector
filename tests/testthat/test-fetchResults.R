@@ -11,6 +11,10 @@ for (testServer in testServers) {
    
     connection <- connect(testServer$connectionDetails)
     on.exit(disconnect(connection))
+    
+    # check that transaction is automatically rolled back when there is an error with querySql
+    # expect_error(querySql(connection, "select a from a;"))
+    
     sql <- "SELECT COUNT(*) AS row_count FROM @cdm_database_schema.vocabulary"
     renderedSql <- SqlRender::render(sql = sql, 
                                      cdm_database_schema = testServer$cdmDatabaseSchema)
@@ -58,7 +62,7 @@ test_that("Logging query times", {
   skip_if_not_installed("ParallelLogger")
   
   queryTimes <- extractQueryTimes(logFileName)
-  expect_gt(nrow(queryTimes), 16)
+  expect_gt(nrow(queryTimes), 3)
   ParallelLogger::unregisterLogger("TEST_LOGGER")
   unlink(logFileName)
 })

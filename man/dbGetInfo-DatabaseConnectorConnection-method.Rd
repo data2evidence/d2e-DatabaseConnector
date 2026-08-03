@@ -7,14 +7,14 @@
 \S4method{dbGetInfo}{DatabaseConnectorConnection}(dbObj, ...)
 }
 \arguments{
-\item{dbObj}{An object inheriting from \linkS4class{DBIObject},
-i.e. \linkS4class{DBIDriver}, \linkS4class{DBIConnection},
-or a \linkS4class{DBIResult}}
+\item{dbObj}{An object inheriting from \link[DBI:DBIObject-class]{DBIObject},
+i.e. \link[DBI:DBIDriver-class]{DBIDriver}, \link[DBI:DBIConnection-class]{DBIConnection},
+or a \link[DBI:DBIResult-class]{DBIResult}}
 
 \item{...}{Other arguments to methods.}
 }
 \value{
-For objects of class \linkS4class{DBIDriver}, \code{dbGetInfo()}
+For objects of class \link[DBI:DBIDriver-class]{DBI::DBIDriver}, \code{dbGetInfo()}
 returns a named list
 that contains at least the following components:
 \itemize{
@@ -22,7 +22,7 @@ that contains at least the following components:
 \item \code{client.version}: the version of the DBMS client library.
 }
 
-For objects of class \linkS4class{DBIConnection}, \code{dbGetInfo()}
+For objects of class \link[DBI:DBIConnection-class]{DBI::DBIConnection}, \code{dbGetInfo()}
 returns a named list
 that contains at least the following components:
 \itemize{
@@ -35,26 +35,25 @@ It must not contain a \code{password} component.
 Components that are not applicable should be set to \code{NA}.
 }
 
-For objects of class \linkS4class{DBIResult}, \code{dbGetInfo()}
+For objects of class \link[DBI:DBIResult-class]{DBI::DBIResult}, \code{dbGetInfo()}
 returns a named list
 that contains at least the following components:
 \itemize{
-\item \code{statatment}: the statement used with \code{\link[DBI:dbSendQuery]{dbSendQuery()}} or \code{\link[DBI:dbExecute]{dbExecute()}},
-as returned by \code{\link[DBI:dbGetStatement]{dbGetStatement()}},
+\item \code{statatment}: the statement used with \code{\link[DBI:dbSendQuery]{DBI::dbSendQuery()}} or \code{\link[DBI:dbExecute]{DBI::dbExecute()}},
+as returned by \code{\link[DBI:dbGetStatement]{DBI::dbGetStatement()}},
 \item \code{row.count}: the number of rows fetched so far (for queries),
-as returned by \code{\link[DBI:dbGetRowCount]{dbGetRowCount()}},
+as returned by \code{\link[DBI:dbGetRowCount]{DBI::dbGetRowCount()}},
 \item \code{rows.affected}: the number of rows affected (for statements),
-as returned by \code{\link[DBI:dbGetRowsAffected]{dbGetRowsAffected()}}
+as returned by \code{\link[DBI:dbGetRowsAffected]{DBI::dbGetRowsAffected()}}
 \item \code{has.completed}: a logical that indicates
 if the query or statement has completed,
-as returned by \code{\link[DBI:dbHasCompleted]{dbHasCompleted()}}.
+as returned by \code{\link[DBI:dbHasCompleted]{DBI::dbHasCompleted()}}.
 }
 }
 \description{
-Retrieves information on objects of class \linkS4class{DBIDriver},
-\linkS4class{DBIConnection} or \linkS4class{DBIResult}.
+Retrieves information on objects of class \link[DBI:DBIDriver-class]{DBIDriver},
+\link[DBI:DBIConnection-class]{DBIConnection} or \link[DBI:DBIResult-class]{DBIResult}.
 
-\Sexpr[results=rd,stage=render]{DBI:::methods_as_rd("dbGetInfo")}
 }
 \seealso{
 Other DBIDriver generics: 
@@ -70,24 +69,32 @@ Other DBIDriver generics:
 Other DBIConnection generics: 
 \code{\link[DBI]{DBIConnection-class}},
 \code{\link[DBI]{dbAppendTable}()},
+\code{\link[DBI]{dbAppendTableArrow}()},
 \code{\link[DBI]{dbCreateTable}()},
+\code{\link[DBI]{dbCreateTableArrow}()},
 \code{\link[DBI]{dbDataType}()},
 \code{\link[DBI]{dbDisconnect}()},
 \code{\link[DBI]{dbExecute}()},
 \code{\link[DBI]{dbExistsTable}()},
 \code{\link[DBI]{dbGetException}()},
 \code{\link[DBI]{dbGetQuery}()},
+\code{\link[DBI]{dbGetQueryArrow}()},
 \code{\link[DBI]{dbIsReadOnly}()},
 \code{\link[DBI]{dbIsValid}()},
 \code{\link[DBI]{dbListFields}()},
 \code{\link[DBI]{dbListObjects}()},
 \code{\link[DBI]{dbListResults}()},
 \code{\link[DBI]{dbListTables}()},
+\code{\link[DBI]{dbQuoteIdentifier}()},
 \code{\link[DBI]{dbReadTable}()},
+\code{\link[DBI]{dbReadTableArrow}()},
 \code{\link[DBI]{dbRemoveTable}()},
 \code{\link[DBI]{dbSendQuery}()},
+\code{\link[DBI]{dbSendQueryArrow}()},
 \code{\link[DBI]{dbSendStatement}()},
-\code{\link[DBI]{dbWriteTable}()}
+\code{\link[DBI]{dbUnquoteIdentifier}()},
+\code{\link[DBI]{dbWriteTable}()},
+\code{\link[DBI]{dbWriteTableArrow}()}
 
 Other DBIResult generics: 
 \code{\link[DBI]{DBIResult-class}},
@@ -101,8 +108,6 @@ Other DBIResult generics:
 \code{\link[DBI]{dbHasCompleted}()},
 \code{\link[DBI]{dbIsReadOnly}()},
 \code{\link[DBI]{dbIsValid}()},
-\code{\link[DBI]{dbQuoteIdentifier}()},
 \code{\link[DBI]{dbQuoteLiteral}()},
-\code{\link[DBI]{dbQuoteString}()},
-\code{\link[DBI]{dbUnquoteIdentifier}()}
+\code{\link[DBI]{dbQuoteString}()}
 }

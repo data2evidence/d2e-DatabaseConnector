@@ -1,3 +1,96 @@
+DatabaseConnector 7.2.0.
+=======================
+
+Changes:
+
+1. Changed BigQuery driver from Simba BigQuery to BigQuery.
+
+2. Added bulk upload for Spark (DataBricks).
+
+3. Updated IRIS JDBC driver.
+
+4. Updated Snowflake driver.
+
+5. Adapted code to support latest DataBricks driver, but not yet downloading in `downloadJdbcDrivers()` because that would require Java >8. This is planned for later this year. 
+    - You can download the latest DataBricks driver manually from https://databricks-bi-artifacts.s3.us-east-2.amazonaws.com/simbaspark-drivers/jdbc/3.4.1/DatabricksJDBC-3.4.1.zip.
+
+6. Made `querySql()` less inefficient for large queries.
+
+Bugfixes:
+
+1. Converted double quotes to spaces when upload to DataBricks to avoid errors.
+
+2. Fixed error when calling `insertTable()` with a data frame having a column of `data.table::IDate`.
+
+3. Fixed errors caused by `dbplyr 2.6.0` dropping v1 backends, which we apparently were still using.
+
+DatabaseConnector 7.1.0
+=======================
+
+Changes:
+
+1. Added ability to pass configuration details (such as setting the maximum memory) when connecting to DuckDB. See `?createConnectionDetails`.
+
+Bugfixes:
+
+1. Fixed `getTableNames()` for DataBricks when quoting (using backticks) the database and/or schema name.
+
+2. Fixing `dbplyr` translations for DuckDB.
+
+
+DatabaseConnector 7.0.0
+=======================
+
+Changes:
+
+1. Changed `dplyr` back-end from using `SqlRender` to native back-ends.
+
+2. Finally dropped `oracleTempEmulationSchema` argument everywhere, after having been deprecated for many years.
+
+3. Fully supporting logical types.
+
+4. When not using `snakeCaseToCamelCase = TRUE`, column names are now returned in the original case to conform with DBI.
+
+5. All `DatabaseConnector` unique top-level functions (e.g. `querySql()` and `getTableNames()`) now work on all `DBI` connections, not just `DatabaseConnector` connections. This is for improved separation of code, and should make it easier to add and remove new database platforms in the future.
+
+6. On connecting to DuckDB checks if the ICU extension is installed and if not, attempts to install it. The ICU extension is needed for some date and time functions such as `CURRENT_DATE`.
+
+
+Bugfixes:
+
+1. Remove direct call to `bit64` S3 method to avoid issues in the future.
+
+2. Fixed error when calling `getTableNames()` on a `DuckDB` connection.
+
+3. Fixed empty schema list in RStudio Connection pane for IRIS.
+
+4. Avoid startup warnings on CRAN's Windows testing environments.
+
+5. Updated Snowflake driver to 3.24.0.
+
+
+DatabaseConnector 6.4.0
+=======================
+
+Changes:
+
+- Adding support for InterSystems IRIS.
+
+
+DatabaseConnector 6.3.3
+=======================
+
+Changes:
+
+- Updated Snowflake driver to 3.16.1.
+
+- Updated Databricks driver to 2.6.36.
+
+- Updated BigQuery driver to 1.6.2.
+
+- Using `INSERT` with multiple values in `insertTable()` for DataBricks for faster inserts.
+
+
 DatabaseConnector 6.3.2
 =======================
 

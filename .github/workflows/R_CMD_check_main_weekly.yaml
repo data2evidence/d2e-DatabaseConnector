@@ -44,7 +44,7 @@ jobs:
       CDM_SNOWFLAKE_OHDSI_SCHEMA: ${{ secrets.CDM_SNOWFLAKE_OHDSI_SCHEMA }}
       CDM_SNOWFLAKE_PASSWORD: ${{ secrets.CDM_SNOWFLAKE_PASSWORD }}
       CDM_SNOWFLAKE_CONNECTION_STRING: ${{ secrets.CDM_SNOWFLAKE_CONNECTION_STRING }}
-      CDM_SNOWFLAKE_USER: ${{ secrets.CDM_SNOWFLAKE_USER }}   
+      CDM_SNOWFLAKE_USER: ${{ secrets.CDM_SNOWFLAKE_USER }}     
       CDM5_SPARK_USER: ${{ secrets.CDM5_SPARK_USER }}
       CDM5_SPARK_PASSWORD: ${{ secrets.CDM5_SPARK_PASSWORD }}
       CDM5_SPARK_CONNECTION_STRING: ${{ secrets.CDM5_SPARK_CONNECTION_STRING }}
@@ -52,7 +52,13 @@ jobs:
       CDM5_SPARK_OHDSI_SCHEMA: ${{ secrets.CDM5_SPARK_OHDSI_SCHEMA }}
 
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
+      
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'corretto'
+          java-version: '8'
 
       - uses: r-lib/actions/setup-r@v2
         with:

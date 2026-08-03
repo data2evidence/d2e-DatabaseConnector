@@ -1,6 +1,4 @@
-# @file CtasHack.R
-#
-# Copyright 2023 Observational Health Data Sciences and Informatics
+# Copyright 2026 Observational Health Data Sciences and Informatics
 #
 # This file is part of DatabaseConnector
 #
@@ -57,7 +55,7 @@ toStrings <- function(data, sqlDataTypes) {
     if (any(intIdx)) {
       result[intIdx] <- sapply(data[, intIdx], format, scientific = FALSE)
     }
-    result <- paste("'", gsub("'", "''", result), "'", sep = "")
+    result <- paste("'", gsub("'", "''", gsub("\"", " ", result)), "'", sep = "")
     result[is.na(data)] <- "NULL"
     return(as.data.frame(t(result), stringsAsFactors = FALSE))
   } else {
@@ -65,7 +63,7 @@ toStrings <- function(data, sqlDataTypes) {
     if (any(intIdx)) {
       result[, intIdx] <- sapply(data[, intIdx], format, scientific = FALSE)
     }
-    result <- apply(result, FUN = function(x) paste("'", gsub("'", "''", x), "'", sep = ""), MARGIN = 2)
+    result <- apply(result, FUN = function(x) paste("'", gsub("'", "''", gsub("\"", " ", x)), "'", sep = ""), MARGIN = 2)
     result[is.na(data)] <- "NULL"
     return(result)
   }
@@ -175,6 +173,47 @@ ctasHack <- function(connection, sqlTableName, tempTable, sqlFieldNames, sqlData
     tempTable = tempTable,
     tempEmulationSchema = tempEmulationSchema
   )
+  delta <- Sys.time() - startTime
+  inform(paste("Inserting data took", signif(delta, 3), attr(delta, "units")))
+}
+
+multiValuesInsert <- function(connection, sqlTableName, sqlFieldNames, sqlDataTypes, data, progressBar, tempEmulationSchema) {
+  logTrace(sprintf("Inserting %d rows into table '%s' using multi-values inserts", nrow(data), sqlTableName))
+  
+  assign("noLogging", TRUE, envir = globalVars)
+  on.exit(
+    assign("noLogging", NULL, envir = globalVars)
+  )
+  startTime <- Sys.time()
+  batchSize <- 1000
+
+  # Insert data in batches using multi-value inserts:
+  if (progressBar) {
+    pb <- txtProgressBar(style = 3)
+  }
+  
+  if (nrow(data) > 0) {
+    for (start in seq(1, nrow(data), by = batchSize)) {
+      if (progressBar) {
+        setTxtProgressBar(pb, start / nrow(data))
+      }
+      end <- min(start + batchSize - 1, nrow(data))
+      batch <- toStrings(data[start:end, , drop = FALSE], sqlDataTypes)
+      valuesString <- paste("(", paste(apply(batch, MARGIN = 1, FUN = paste, collapse = ","), collapse = "),("), ")")
+        
+      sql <- "INSERT INTO @table (@fields) VALUES @values;"
+      sql <- SqlRender::render(sql = sql,
+                               table = sqlTableName,
+                               fields = sqlFieldNames,
+                               values = valuesString)
+      sql <- SqlRender::translate(sql, targetDialect = dbms(connection), tempEmulationSchema = tempEmulationSchema)
+      executeSql(connection, sql, progressBar = FALSE, reportOverallTime = FALSE)
+    }
+  }
+  if (progressBar) {
+    setTxtProgressBar(pb, 1)
+    close(pb)
+  }
   delta <- Sys.time() - startTime
   inform(paste("Inserting data took", signif(delta, 3), attr(delta, "units")))
 }

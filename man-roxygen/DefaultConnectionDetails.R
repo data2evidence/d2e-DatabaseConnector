@@ -6,7 +6,7 @@
 #'                           provider to configure things as security for SSL. For connections using 
 #'                           JDBC these will be appended to end of the connection string. For 
 #'                           connections using DBI, these settings will additionally be used to call
-#'                           [dbConnect()].
+#'                           [DBI::dbConnect()].
 #' @param oracleDriver       Specify which Oracle drive you want to use. Choose between `"thin"`
 #'                           or `"oci"`.
 #' @param connectionString   The JDBC connection string. If specified, the `server`, `port`,
@@ -107,6 +107,14 @@
 #' 
 #'  - `server`. The path to the SQLIte file.
 #' 
+#' DuckDB:
+#' 
+#'  - `server`. The path to the DuckDB file.
+#'  - `extraSettings`. Additional settings for DuckDB. For DuckDB specifically, if 
+#'         `extraSettings$config` is provided, it will be passed to the 
+#'         `duckdb::duckdb()` constructor. For example: 
+#'         `extraSettings = list(config = list(memory_limit = "8GB", preserve_insertion_order = "false"))`
+#' 
 #' Spark / Databricks:
 #' 
 #' Currently both JDBC and ODBC connections are supported for Spark. Set the 
@@ -131,6 +139,14 @@
 #'  - `user`. The user name used to access the server.
 #'  - `password`. The password for that user.
 #' 
+#' InterSystems IRIS:
+#'  - `connectionString`. The connection string (e.g. starting with
+#'         'jdbc:IRIS://host:port/namespace'). Alternatively, you can provide
+#'         values for `server` and `port`, in which case the default `USER` namespace
+#'         is used to connect.
+#'  - `user`. The user name used to access the server.
+#'  - `password`. The password for that user.
+#'  - `pathToDriver`. The path to the folder containing the InterSystems IRIS JDBC driver JAR file.
 #'
 #' ## Windows authentication for SQL Server:
 #'

@@ -3,8 +3,8 @@ DatabaseConnector
 
 [![Build Status](https://github.com/OHDSI/DatabaseConnector/workflows/R-CMD-check/badge.svg)](https://github.com/OHDSI/DatabaseConnector/actions?query=workflow%3AR-CMD-check)
 [![codecov.io](https://codecov.io/github/OHDSI/DatabaseConnector/coverage.svg?branch=main)](https://app.codecov.io/github/OHDSI/DatabaseConnector?branch=mai)
-[![CRAN_Status_Badge](http://www.r-pkg.org/badges/version/DatabaseConnector)](https://cran.r-project.org/package=DatabaseConnector)
-[![CRAN_Status_Badge](http://cranlogs.r-pkg.org/badges/DatabaseConnector)](https://cran.r-project.org/package=DatabaseConnector)
+[![CRAN_Status_Badge](https://www.r-pkg.org/badges/version/DatabaseConnector)](https://cran.r-project.org/package=DatabaseConnector)
+[![CRAN_Status_Badge](https://cranlogs.r-pkg.org/badges/DatabaseConnector)](https://cran.r-project.org/package=DatabaseConnector)
 
 DatabaseConnector is part of [HADES](https://ohdsi.github.io/Hades/).
 
@@ -22,18 +22,17 @@ Features
   - PostgresSql
   - Microsoft Parallel Data Warehouse (a.k.a. Analytics Platform System)
   - Amazon Redshift
-  - Apache Impala
   - Google BigQuery
-  - IBM Netezza
   - SQLite
   - Spark
+  - InterSystems IRIS
 - Statements for executing queries with 
   - Error reporting to file
   - Progress reporting
   - Multiple statements per query
 - Support for fetching data to Andromeda objects
-- Insert data frame to a database table
-- Supports the `DBI` interface, with SQL statements automatically translated to the appropriate dialect.
+- Insert data frame to a database table, using bulk loading if appropriate environmental variables are set.
+- Supports the `DBI` interface.
 - Supports the `dbplyr` interface.
 - Integrates with RStudio's Connections tab
 
@@ -78,6 +77,7 @@ install.packages("DatabaseConnector")
 3. Download the database drivers as described [here](http://ohdsi.github.io/DatabaseConnector/articles/Connecting.html#obtaining-drivers).
 
 4. (Optionally) To use Windows Authentication for SQL Server, download the authentication DDL file as described  [here](http://ohdsi.github.io/DatabaseConnector/reference/connect.html#windows-authentication-for-sql-server-1).
+
 
 User Documentation
 ==================

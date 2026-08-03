@@ -18,9 +18,10 @@ downloadJdbcDrivers(
 \item "redshift" for Amazon Redshift
 \item "sql server", "pdw" or "synapse" for Microsoft SQL Server
 \item "oracle" for Oracle
-\item "spark" for Spark
+\item "spark" for Spark (Databricks)
 \item "snowflake" for Snowflake
 \item "bigquery" for Google BigQuery
+\item "iris" for InterSystems IRIS
 \item "all" for all aforementioned platforms
 }}
 
@@ -40,13 +41,14 @@ Download the DatabaseConnector JDBC drivers from https://ohdsi.github.io/Databas
 \details{
 The following versions of the JDBC drivers are currently used:
 \itemize{
-\item PostgreSQL: V42.2.18
-\item RedShift: V2.1.0.9
+\item PostgreSQL: V42.7.3
+\item RedShift: V2.1.0.20
 \item SQL Server: V9.2.0
 \item Oracle: V19.8
-\item Spark: V2.6.21
-\item Snowflake: V3.13.22
-\item BigQuery: v1.3.2.1003
+\item Spark (Databricks): V2.6.36
+\item Snowflake: V4.3.1
+\item BigQuery: v0.10.0
+\item InterSystems IRIS: v3.11.0
 }
 }
 \examples{

@@ -4,25 +4,23 @@
 \alias{dbSendStatement,DatabaseConnectorConnection,character-method}
 \title{Execute a data manipulation statement on a given database connection}
 \usage{
-\S4method{dbSendStatement}{DatabaseConnectorConnection,character}(conn, statement, translate = TRUE, ...)
+\S4method{dbSendStatement}{DatabaseConnectorConnection,character}(conn, statement, ...)
 }
 \arguments{
-\item{conn}{A \linkS4class{DBIConnection} object, as returned by
-\code{\link[DBI:dbConnect]{dbConnect()}}.}
+\item{conn}{A \link[DBI:DBIConnection-class]{DBI::DBIConnection} object,
+as returned by \code{\link[DBI:dbConnect]{dbConnect()}}.}
 
 \item{statement}{a character string containing SQL.}
-
-\item{translate}{Translate the query using SqlRender?}
 
 \item{...}{Other parameters passed on to methods.}
 }
 \value{
 \code{dbSendStatement()} returns
-an S4 object that inherits from \linkS4class{DBIResult}.
-The result set can be used with \code{\link[DBI:dbGetRowsAffected]{dbGetRowsAffected()}} to
+an S4 object that inherits from \link[DBI:DBIResult-class]{DBI::DBIResult}.
+The result set can be used with \code{\link[DBI:dbGetRowsAffected]{DBI::dbGetRowsAffected()}} to
 determine the number of rows affected by the query.
 Once you have finished using a result, make sure to clear it
-with \code{\link[DBI:dbClearResult]{dbClearResult()}}.
+with \code{\link[DBI:dbClearResult]{DBI::dbClearResult()}}.
 }
 \description{
 The \code{dbSendStatement()} method only submits and synchronously executes the
@@ -33,7 +31,6 @@ returned result object.  You must also call \code{\link[DBI:dbClearResult]{dbCle
 that. For interactive use, you should almost always prefer
 \code{\link[DBI:dbExecute]{dbExecute()}}.
 
-\Sexpr[results=rd,stage=render]{DBI:::methods_as_rd("dbSendStatement")}
 }
 \details{
 \code{\link[DBI:dbSendStatement]{dbSendStatement()}} comes with a default implementation that simply
@@ -46,7 +43,9 @@ For queries: \code{\link[DBI:dbSendQuery]{dbSendQuery()}} and \code{\link[DBI:db
 Other DBIConnection generics: 
 \code{\link[DBI]{DBIConnection-class}},
 \code{\link[DBI]{dbAppendTable}()},
+\code{\link[DBI]{dbAppendTableArrow}()},
 \code{\link[DBI]{dbCreateTable}()},
+\code{\link[DBI]{dbCreateTableArrow}()},
 \code{\link[DBI]{dbDataType}()},
 \code{\link[DBI]{dbDisconnect}()},
 \code{\link[DBI]{dbExecute}()},
@@ -54,14 +53,26 @@ Other DBIConnection generics:
 \code{\link[DBI]{dbGetException}()},
 \code{\link[DBI]{dbGetInfo}()},
 \code{\link[DBI]{dbGetQuery}()},
+\code{\link[DBI]{dbGetQueryArrow}()},
 \code{\link[DBI]{dbIsReadOnly}()},
 \code{\link[DBI]{dbIsValid}()},
 \code{\link[DBI]{dbListFields}()},
 \code{\link[DBI]{dbListObjects}()},
 \code{\link[DBI]{dbListResults}()},
 \code{\link[DBI]{dbListTables}()},
+\code{\link[DBI]{dbQuoteIdentifier}()},
 \code{\link[DBI]{dbReadTable}()},
+\code{\link[DBI]{dbReadTableArrow}()},
 \code{\link[DBI]{dbRemoveTable}()},
 \code{\link[DBI]{dbSendQuery}()},
-\code{\link[DBI]{dbWriteTable}()}
+\code{\link[DBI]{dbSendQueryArrow}()},
+\code{\link[DBI]{dbUnquoteIdentifier}()},
+\code{\link[DBI]{dbWriteTable}()},
+\code{\link[DBI]{dbWriteTableArrow}()}
+
+Other command execution generics: 
+\code{\link[DBI]{dbBind}()},
+\code{\link[DBI]{dbClearResult}()},
+\code{\link[DBI]{dbExecute}()},
+\code{\link[DBI]{dbGetRowsAffected}()}
 }
